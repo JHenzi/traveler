@@ -21,6 +21,7 @@
   const locationInput   = document.getElementById('location-input');
   const locationBtn     = document.getElementById('location-btn');
   const locationStatus  = document.getElementById('location-status');
+  const headerStation   = document.getElementById('header-station');
 
   const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const COMPASS = [
@@ -123,6 +124,7 @@
         originLon   = parseFloat(r.lon);
         originLabel = r.display_name.split(',').slice(0, 2).join(',').trim();
         if (locationStatus) locationStatus.textContent = 'Showing camps near: ' + originLabel;
+        if (headerStation) headerStation.textContent = originLabel.toUpperCase();
         if (locationBtn) locationBtn.disabled = false;
         refresh(false);
       })
