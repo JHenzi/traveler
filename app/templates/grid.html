@@ -1,39 +1,37 @@
 {% if rows %}
-<div class="table-wrapper">
-  <table class="forecast-table">
-    <thead>
-      <tr>
-        <th class="col-dest">Destination</th>
-        <th class="col-dir">Direction</th>
-        {% for day in rows[0].days %}
-        <th class="col-day">
-          Day {{ loop.index }}<br/>
-          <small>{{ day.date[5:] }}</small>
-        </th>
-        {% endfor %}
-        <th class="col-dry">Dry Window</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in rows %}
-      <tr>
-        <td class="col-dest">{{ row.name }}</td>
-        <td class="col-dir">{{ row.direction }}</td>
-        {% for day in row.days %}
-        <td class="col-day {% if day.precip_prob <= threshold %}dry{% else %}wet{% endif %}{% if day.temp_max > temp_threshold %} hot{% endif %}">
-          <span class="emoji">{{ day.emoji }}</span><br/>
-          <span class="temp">{{ day.temp_max | round(0) | int }}°F</span><br/>
-          <span class="precip">{{ day.precip_prob }}%</span>
-        </td>
-        {% endfor %}
-        <td class="col-dry dry-window">
-          {{ row.dry_window }}d
-        </td>
-      </tr>
+<table class="bur-table" style="min-width:{{ [660, 380 + (rows[0].days | length) * 60] | max }}px;">
+  <thead>
+    <tr>
+      <th class="col-rank">#</th>
+      <th>Station</th>
+      <th>Bearing</th>
+      {% for day in rows[0].days %}
+      <th class="col-day">
+        <span class="bur-th-day-dow">{{ day.date[5:] }}</span>
+      </th>
       {% endfor %}
-    </tbody>
-  </table>
-</div>
+      <th class="col-center">Dry</th>
+      <th class="col-right">Index</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr data-name="{{ row.name }}">
+      <td class="col-rank{% if loop.index <= 3 %} col-rank--top{% endif %}">{{ loop.index }}</td>
+      <td class="col-name">{{ row.name }}</td>
+      <td class="col-dir">{{ row.direction | upper }}</td>
+      {% for day in row.days %}
+      <td class="col-day {% if day.precip_prob <= threshold %}col-day--dry{% else %}col-day--wet{% endif %}">
+        <div class="bur-cell-temp{% if day.temp_max > temp_threshold %} bur-cell-temp--hot{% endif %}">{{ day.temp_max | round(0) | int }}°</div>
+        <div class="bur-cell-rain{% if day.precip_prob > threshold %} bur-cell-rain--wet{% endif %}">{{ day.precip_prob }}%</div>
+      </td>
+      {% endfor %}
+      <td class="col-dry {% if row.dry_window >= 5 %}bur-dry--good{% elif row.dry_window >= 3 %}bur-dry--ok{% else %}bur-dry--bad{% endif %}">{{ row.dry_window }}D</td>
+      <td class="col-score"><span class="bur-score--mid">—</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% else %}
-<p class="error">No forecast data available.</p>
+<p style="padding:16px;color:var(--soft);font-size:11px;">No forecast data available.</p>
 {% endif %}

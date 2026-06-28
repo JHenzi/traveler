@@ -1,4 +1,6 @@
 import time
+import math
+from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify
 from .destinations import load_destinations
 from .weather import build_grid, build_top3, cache_last_updated
@@ -6,6 +8,26 @@ from .weather import build_grid, build_top3, cache_last_updated
 bp = Blueprint('main', __name__)
 
 DEFAULTS = dict(threshold=30, horizon=7, departure_day=2, temp_threshold=82)
+CINCINNATI = (39.1031, -84.5120)
+
+
+def _bearing(lat1, lon1, lat2, lon2):
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    x = math.sin(lon2 - lon1) * math.cos(lat2)
+    y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(lon2 - lon1)
+    return (math.degrees(math.atan2(x, y)) + 360) % 360
+
+
+def _bearing_to_dir(b):
+    dirs = ['North', 'Northeast', 'East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest']
+    return dirs[round(b / 45) % 8]
+
+
+def _recompute_directions(destinations, olat, olon):
+    for d in destinations:
+        if 'lat' in d and 'lon' in d:
+            d['direction'] = _bearing_to_dir(_bearing(olat, olon, d['lat'], d['lon']))
+    return destinations
 
 
 def _format_updated(ts):
@@ -27,6 +49,7 @@ def index():
     rows = build_grid(destinations, horizon=h, threshold=t)
     top3 = build_top3(rows, departure_day=dep, threshold=t, temp_threshold=tt)
     best = rows[0] if rows else None
+    now  = datetime.now()
     return render_template(
         'index.html',
         rows=rows,
@@ -37,6 +60,8 @@ def index():
         top3=top3,
         best=best,
         last_updated=_format_updated(cache_last_updated()),
+        bulletin_no=f"{now.strftime('%y')}-{now.timetuple().tm_yday:03d}",
+        today=now.strftime('%m·%d'),
     )
 
 
@@ -48,7 +73,11 @@ def forecast():
     departure_day = int(body.get('departure_day', DEFAULTS['departure_day']))
     temp_threshold = int(body.get('temp_threshold', DEFAULTS['temp_threshold']))
     force         = bool(body.get('force', False))
+    origin_lat    = body.get('origin_lat')
+    origin_lon    = body.get('origin_lon')
     destinations  = load_destinations()
+    if origin_lat is not None and origin_lon is not None:
+        _recompute_directions(destinations, float(origin_lat), float(origin_lon))
     rows = build_grid(destinations, horizon=horizon, threshold=threshold, force=force)
     top3 = build_top3(rows, departure_day=departure_day, threshold=threshold, temp_threshold=temp_threshold)
     best = rows[0] if rows else None

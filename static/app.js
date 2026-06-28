@@ -1,21 +1,26 @@
 (function () {
-  const thresholdInput   = document.getElementById('threshold');
-  const thresholdVal     = document.getElementById('threshold-val');
-  const tempThreshInput  = document.getElementById('temp-threshold');
-  const tempThreshVal    = document.getElementById('temp-threshold-val');
-  const horizonInputs    = document.querySelectorAll('input[name="horizon"]');
-  const depDayInput      = document.getElementById('departure-day');
-  const depDayVal        = document.getElementById('departure-day-val');
-  const depHint          = document.getElementById('departure-hint');
-  const gridContainer    = document.getElementById('grid-container');
-  const kpiStrip         = document.getElementById('kpi-strip');
-  const top3Panel        = document.getElementById('top3-panel');
-  const refreshBtn       = document.getElementById('refresh-btn');
-  const lastUpdatedEl    = document.getElementById('last-updated');
+  /* ── ELEMENTS ── */
+  const thresholdInput  = document.getElementById('threshold');
+  const thresholdVal    = document.getElementById('threshold-val');
+  const tempInput       = document.getElementById('temp-threshold');
+  const tempVal         = document.getElementById('temp-threshold-val');
+  const horizonBtns     = document.querySelectorAll('.bur-horizon-btn');
+  const departGrid      = document.getElementById('depart-btns');
+  const picksContainer  = document.getElementById('picks-container');
+  const verdictLine     = document.getElementById('verdict-line');
+  const tripPlanWrap    = document.getElementById('trip-plan-wrap');
+  const gridContainer   = document.getElementById('grid-container');
+  const radarContainer  = document.getElementById('radar-container');
+  const refreshBtn      = document.getElementById('refresh-btn');
+  const lastUpdatedEl   = document.getElementById('last-updated');
+  const lastUpdatedFt   = document.getElementById('last-updated-footer');
+  const stationCount    = document.getElementById('station-count');
+  const tickerText      = document.getElementById('ticker-text');
+  const locationInput   = document.getElementById('location-input');
+  const locationBtn     = document.getElementById('location-btn');
+  const locationStatus  = document.getElementById('location-status');
 
-  const AUTO_REFRESH_MS = 30 * 60 * 1000;
   const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
   const COMPASS = [
     { label: 'N',  match: ['north'] },
     { label: 'NE', match: ['northeast', 'ne'] },
@@ -27,221 +32,373 @@
     { label: 'NW', match: ['northwest', 'nw'] },
   ];
 
+  /* ── STATE ── */
   let forecastDates = [];
-  let radarChart    = null;
+  let currentRows   = [];
+  let focusName     = null;
+  let horizon       = parseInt(document.querySelector('.bur-horizon-btn.active')?.dataset.val || '7', 10);
+  let departIdx     = parseInt(document.querySelector('.bur-depart-btn.active')?.dataset.day || '2', 10) - 1;
   let debounceTimer = null;
+  let originLat     = 39.1031;
+  let originLon     = -84.5120;
+  let originLabel   = 'Cincinnati, OH';
 
-  // "2026-06-05" -> "Thu"  (local date to avoid UTC-shift off-by-one)
+  /* ── HELPERS ── */
   function dayName(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
     return SHORT_DAYS[new Date(y, m - 1, d).getDay()];
   }
 
-  function getHorizon() {
-    for (const r of horizonInputs) {
-      if (r.checked) return parseInt(r.value, 10);
+  function dateShort(dateStr) {
+    return dateStr.slice(5); // "MM-DD"
+  }
+
+  function getThreshold() { return parseInt(thresholdInput.value, 10); }
+  function getTempThreshold() { return parseInt(tempInput.value, 10); }
+
+  function computeScore(days, depIdx, threshold, tempThreshold) {
+    if (depIdx >= days.length) return null;
+    if (days[depIdx].precip_prob > threshold) return null;
+    const win = days.slice(depIdx, depIdx + 3);
+    const d0 = win[0] ? win[0].precip_prob : 0;
+    const d1 = win[1] ? win[1].precip_prob : 0;
+    const d2 = win[2] ? win[2].precip_prob : 0;
+    const rain = d0 * 0.50 + d1 * 0.35 + d2 * 0.15;
+    const heat = win.slice(0, 3).reduce((s, day, j) =>
+      s + Math.max(0, day.temp_max - tempThreshold) * [0.50, 0.35, 0.15][j] * 1.2, 0);
+    return Math.max(0, +(100 - rain - heat).toFixed(1));
+  }
+
+  function dryWindowFrom(days, startIdx, threshold) {
+    let count = 0;
+    for (let i = startIdx; i < days.length; i++) {
+      if (days[i] && days[i].precip_prob <= threshold) count++;
+      else break;
     }
-    return 7;
+    return count;
   }
 
-  function getDepartureDay() {
-    return parseInt(depDayInput.value, 10);
+  function scoreClass(score) {
+    if (score === null) return 'bur-score--none';
+    if (score >= 85) return 'bur-score--good';
+    if (score >= 72) return 'bur-score--mid';
+    return 'bur-score--low';
   }
 
-  function updateDepLabel(val) {
-    const date = forecastDates[val - 1];
-    if (date) {
-      depDayVal.textContent = dayName(date);
-      const [y, m, d] = date.split('-').map(Number);
-      depHint.textContent = new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } else {
-      depDayVal.textContent = 'Day ' + val;
-      depHint.textContent   = '';
-    }
+  function dryClass(n) {
+    if (n >= 5) return 'bur-dry--good';
+    if (n >= 3) return 'bur-dry--ok';
+    return 'bur-dry--bad';
   }
 
-  function getTempThreshold() {
-    return parseInt(tempThreshInput.value, 10);
+  function verdictLabel(row, threshold) {
+    const w = row.dry_window;
+    const avg = row.days.length
+      ? Math.round(row.days.reduce((s, d) => s + d.precip_prob, 0) / row.days.length)
+      : 50;
+    if (w >= 5) return ['CLEAR — EXTENDED DRY WINDOW CONFIRMED.', 'bur-trip-verdict'];
+    if (w >= 3) return ['MARGINAL — DRY EARLY, WATCH LATTER DAYS.', 'bur-trip-verdict bur-trip-verdict--marginal'];
+    if (avg > 50) return ['WET — ADVISE RAIN CONTINGENCY.', 'bur-trip-verdict bur-trip-verdict--wet'];
+    return ['VARIABLE — ROUTE WITH FLEXIBILITY.', 'bur-trip-verdict bur-trip-verdict--marginal'];
   }
 
-  function refresh(force) {
-    const threshold    = parseInt(thresholdInput.value, 10);
-    const tempThresh   = getTempThreshold();
-    const horizon      = getHorizon();
-    const departureDay = getDepartureDay();
-
-    gridContainer.classList.add('loading');
-    top3Panel.classList.add('loading');
-    if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.textContent = '↻ Refreshing…'; }
-
-    fetch('/api/forecast', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ threshold, temp_threshold: tempThresh, horizon, departure_day: departureDay, force: !!force }),
-    })
+  /* ── LOCATION / GEOCODING ── */
+  function geocodeLocation(query) {
+    if (locationStatus) locationStatus.textContent = 'Looking up…';
+    if (locationBtn)    locationBtn.disabled = true;
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
+    fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'WeatherHorizonApp/1.0' } })
       .then(r => r.json())
-      .then(data => {
-        if (data.rows && data.rows[0]) {
-          forecastDates = data.rows[0].days.map(d => d.date);
-          updateDepLabel(getDepartureDay());
+      .then(results => {
+        if (!results || results.length === 0) {
+          if (locationStatus) locationStatus.textContent = 'Location not found. Try again.';
+          if (locationBtn) locationBtn.disabled = false;
+          return;
         }
-        renderTop3(data.top3, data.departure_day, data.threshold, data.temp_threshold);
-        renderKPI(data.best);
-        renderGrid(data.rows, data.horizon, data.threshold, data.temp_threshold);
-        renderRadar(data.rows, data.departure_day, data.threshold, data.temp_threshold);
-        gridContainer.classList.remove('loading');
-        top3Panel.classList.remove('loading');
-        if (lastUpdatedEl) lastUpdatedEl.textContent = data.last_updated;
-        if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = '↻ Refresh'; }
+        const r = results[0];
+        originLat   = parseFloat(r.lat);
+        originLon   = parseFloat(r.lon);
+        originLabel = r.display_name.split(',').slice(0, 2).join(',').trim();
+        if (locationStatus) locationStatus.textContent = 'Showing camps near: ' + originLabel;
+        if (locationBtn) locationBtn.disabled = false;
+        refresh(false);
       })
       .catch(() => {
-        gridContainer.classList.remove('loading');
-        top3Panel.classList.remove('loading');
-        if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = '↻ Refresh'; }
+        if (locationStatus) locationStatus.textContent = 'Geocode failed. Check your connection.';
+        if (locationBtn) locationBtn.disabled = false;
       });
   }
 
-  function renderTop3(top3, departureDay, threshold, tempThreshold) {
+  /* ── DEPARTURE BUTTONS ── */
+  function renderDepartBtns() {
+    if (!departGrid) return;
+    const today = new Date();
+    departGrid.innerHTML = '';
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dow = SHORT_DAYS[d.getDay()];
+      const md  = (d.getMonth() + 1) + '/' + d.getDate();
+      const btn = document.createElement('button');
+      btn.className = 'bur-depart-btn' + (i === departIdx ? ' active' : '');
+      btn.dataset.idx = i;
+      btn.innerHTML = `<span class="bur-depart-dow">${dow}</span><span class="bur-depart-md">${md}</span>`;
+      btn.addEventListener('click', () => {
+        departIdx = i;
+        document.querySelectorAll('.bur-depart-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        refresh(false);
+      });
+      departGrid.appendChild(btn);
+    }
+  }
+
+  /* ── TICKER ── */
+  function renderTicker(rows, top3) {
+    if (!rows || rows.length === 0) return;
+    const threshold = getThreshold();
+    const wet = rows.filter(r => {
+      const avg = r.days.reduce((s, d) => s + d.precip_prob, 0) / (r.days.length || 1);
+      return avg > 55;
+    }).length;
+    const top = top3 && top3[0];
+    const topDry = top ? dryWindowFrom(top.days, departIdx, threshold) : 0;
+    const parts = [
+      wet + ' CAMPS SHOW RAIN RISK',
+      top ? 'BEST DIRECTION: ' + top.direction.toUpperCase() : '',
+      top ? top.name.toUpperCase() + ' — ' + topDry + ' DRY DAYS FROM DEPARTURE' : '',
+    ].filter(Boolean);
+    if (tickerText) tickerText.textContent = parts.join(' · ');
+  }
+
+  /* ── VERDICT LINE ── */
+  function renderVerdict(top3) {
+    if (!verdictLine) return;
     if (!top3 || top3.length === 0) {
-      top3Panel.innerHTML = `<div class="top3-empty">
-        No destinations pass the rain filter for Day ${departureDay} at ${threshold}% threshold.
-        Try raising the tolerance or choosing a different departure day.
+      verdictLine.textContent = 'No qualifying routes for current parameters.';
+      return;
+    }
+    const top = top3[0];
+    const topDry = dryWindowFrom(top.days, departIdx, getThreshold());
+    verdictLine.textContent =
+      'ROUTE ' + top.direction.toUpperCase() +
+      ' — ' + top.name +
+      ' HOLDS ' + topDry + ' DRY DAYS.';
+  }
+
+  /* ── PICK CARDS (Priority Dispatch) ── */
+  function renderPicks(top3) {
+    if (!picksContainer) return;
+    if (!top3 || top3.length === 0) {
+      picksContainer.innerHTML =
+        '<div class="bur-picks-empty">NO QUALIFYING ROUTES FOR CURRENT PARAMETERS. ' +
+        'RAISE RAIN TOLERANCE OR SELECT A DIFFERENT DEPARTURE DAY.</div>';
+      return;
+    }
+    const threshold = getThreshold();
+    const tempThreshold = getTempThreshold();
+
+    const cards = top3.map((rec, i) => {
+      const isTop = i === 0;
+      const label = 'A-' + (i + 1);
+      const score = rec.score !== undefined ? rec.score
+        : (computeScore(rec.days, departIdx, threshold, tempThreshold) || '—');
+      const dryFromDep = dryWindowFrom(rec.days, departIdx, threshold);
+      // heat warning: any day in 3-day departure window exceeds ceiling
+      const win3 = rec.days.slice(departIdx, departIdx + 3);
+      const hasHeat = win3.some(d => d && d.temp_max > tempThreshold);
+      const heatBadge = hasHeat
+        ? `<span class="bur-pick-heat-badge">&#9650; HEAT WARNING</span>` : '';
+      return `<button class="bur-pick-card${isTop ? ' bur-pick-card--top' : ''}" data-name="${esc(rec.name)}">
+        <div class="bur-pick-tag">
+          <span>${label}</span>
+          <span class="bur-pick-tag-dir">${rec.direction.toUpperCase()}</span>
+        </div>
+        <div class="bur-pick-body">
+          <div class="bur-pick-name">${esc(rec.name)}</div>
+          ${heatBadge}
+          <div class="bur-pick-foot">
+            <div>
+              <span class="bur-pick-score">${typeof score === 'number' ? score.toFixed(1) : score}</span>
+              <span class="bur-pick-score-denom">/100</span>
+            </div>
+            <div class="bur-pick-meta">
+              <div>${dryFromDep}D DRY</div>
+            </div>
+          </div>
+        </div>
+      </button>`;
+    }).join('');
+
+    picksContainer.innerHTML = `<div class="bur-picks">${cards}</div>`;
+    picksContainer.querySelectorAll('.bur-pick-card').forEach(btn => {
+      btn.addEventListener('click', () => setFocus(btn.dataset.name));
+    });
+  }
+
+  /* ── PARK FORECAST ── */
+  function renderTripPlan(rows) {
+    if (!tripPlanWrap) return;
+    if (!focusName || !rows || rows.length === 0) {
+      tripPlanWrap.innerHTML = `<div class="bur-trip-plan bur-trip-plan--empty">
+        <div class="bur-trip-empty-msg">&#9654; Click any row in the table below to see its full forecast here.</div>
       </div>`;
       return;
     }
+    const threshold    = getThreshold();
+    const tempThresh   = getTempThreshold();
+    const row = rows.find(r => r.name === focusName);
+    if (!row) return;
 
-    const depDate  = forecastDates[departureDay - 1];
-    const depLabel = depDate ? dayName(depDate) : `Day ${departureDay}`;
+    const depIdx = departIdx;
+    const days   = row.days;
 
-    const cards = top3.map((rec, i) => {
-      const rank      = i + 1;
-      const rankLabel = rank === 1 ? '#1 Best Match' : `#${rank}`;
-      const bestCls   = rank === 1 ? 'rec-best' : '';
-      const depIdx    = rec.departure_day - 1;
-      const weights   = [50, 35, 15];
+    // find best start (longest consecutive dry window)
+    let bestStart = 0, bestLen = 0, cur = 0, curStart = 0;
+    days.forEach((d, i) => {
+      if (d.precip_prob <= threshold) {
+        if (cur === 0) curStart = i;
+        cur++;
+        if (cur > bestLen) { bestLen = cur; bestStart = curStart; }
+      } else { cur = 0; }
+    });
 
-      const dayCells = rec.days.slice(depIdx, depIdx + 3).map((day, j) => {
-        const rainCls = day.precip_prob <= threshold ? 'dry' : 'wet';
-        const hotCls  = day.temp_max > tempThreshold ? ' hot' : '';
-        const temp    = Math.round(day.temp_max);
-        return `<div class="rec-day ${rainCls}${hotCls}">
-          <span class="rec-day-label">${dayName(day.date)}</span>
-          <span class="rec-day-emoji">${day.emoji}</span>
-          <span class="rec-day-temp">${temp}°F</span>
-          <span class="rec-day-precip">${day.precip_prob}%</span>
-          <span class="rec-day-weight">×${weights[j]}%</span>
-        </div>`;
-      }).join('');
-
-      return `<div class="rec-card ${bestCls}">
-        <div class="rec-rank">${rankLabel}</div>
-        <div class="rec-name">${rec.name}</div>
-        <div class="rec-dir">${rec.direction}</div>
-        <div class="rec-score">
-          <span class="score-num">${rec.score}</span>
-          <span class="score-label">/ 100</span>
-        </div>
-        <div class="rec-window-row">${dayCells}</div>
-        <div class="rec-dry-window">Dry window: ${rec.dry_window}d</div>
+    const dayCells = days.map((day, i) => {
+      const dry   = day.precip_prob <= threshold;
+      const hot   = day.temp_max > tempThresh;
+      const inWin = i >= bestStart && i < bestStart + bestLen;
+      const dow   = forecastDates[i] ? dayName(forecastDates[i]) : ('D' + (i + 1));
+      const md    = forecastDates[i] ? dateShort(forecastDates[i]) : '';
+      let cls = 'bur-trip-day';
+      if (inWin) cls += ' bur-trip-day--win';
+      if (hot)   cls += ' bur-trip-day--hot';
+      return `<div class="${cls}">
+        <div class="bur-trip-day-dow">${dow.toUpperCase()}</div>
+        <div class="bur-trip-day-md">${md}</div>
+        <div class="bur-trip-day-temp">${Math.round(day.temp_max)}°${hot ? '<span class="bur-heat-tag">HEAT</span>' : ''}</div>
+        <div class="bur-trip-day-rain${dry ? '' : ' bur-trip-day-rain--wet'}">${day.precip_prob}%</div>
+        <div class="bur-trip-day-code">${day.emoji || ''}</div>
       </div>`;
     }).join('');
 
-    top3Panel.innerHTML = `
-      <h2 class="section-label">Trip Quality Rankings — Departing ${depLabel}</h2>
-      <div class="top3-cards">${cards}</div>
-    `;
+    const [vText, vClass] = verdictLabel(row, threshold);
+    const winStart = forecastDates[bestStart]
+      ? dayName(forecastDates[bestStart]) + ' ' + dateShort(forecastDates[bestStart]) : '—';
+
+    tripPlanWrap.innerHTML = `
+      <div class="bur-trip-plan">
+        <div class="bur-trip-plan-hdr">
+          <div class="bur-trip-plan-name">
+            <span class="bur-trip-plan-label">Park Forecast — </span>
+            <span class="bur-trip-plan-dest">${esc(row.name)}</span>
+          </div>
+          <div class="bur-trip-plan-meta">${row.direction.toUpperCase()}</div>
+        </div>
+        <div class="bur-trip-days">${dayCells}</div>
+        <div class="bur-trip-footer">
+          <span class="${vClass}">${vText}</span>
+          <span class="bur-trip-window-meta">
+            BEST WINDOW ${winStart} · ${bestLen}D · AVG RAIN ${Math.round(days.reduce((s,d)=>s+d.precip_prob,0)/days.length)}%
+          </span>
+        </div>
+      </div>`;
   }
 
-  function renderKPI(best) {
-    if (!best) { kpiStrip.innerHTML = ''; return; }
-    const plural = best.dry_window !== 1 ? 's' : '';
-    kpiStrip.innerHTML = `
-      <div class="kpi">
-        <span class="kpi-label">Best Dry Window</span>
-        <span class="kpi-value">${best.name}</span>
-      </div>
-      <div class="kpi">
-        <span class="kpi-label">Direction</span>
-        <span class="kpi-value">${best.direction}</span>
-      </div>
-      <div class="kpi">
-        <span class="kpi-label">Dry Days</span>
-        <span class="kpi-value">${best.dry_window} day${plural}</span>
-      </div>
-    `;
-  }
-
-  function renderGrid(rows, horizon, threshold, tempThreshold) {
+  /* ── TABLE (Station Data Sheet) ── */
+  function renderTable(rows) {
+    if (!gridContainer) return;
     if (!rows || rows.length === 0) {
-      gridContainer.innerHTML = '<p class="error">No forecast data available.</p>';
+      gridContainer.innerHTML = '<p style="padding:16px;color:var(--soft);font-size:11px;">No forecast data available.</p>';
       return;
     }
+    const threshold   = getThreshold();
+    const tempThresh  = getTempThreshold();
 
-    const dayHeaders = rows[0].days.map(d =>
-      `<th class="col-day">${dayName(d.date)}<br/><small>${d.date.slice(5)}</small></th>`
-    ).join('');
+    // compute scores and re-rank
+    const scored = rows.map(row => ({
+      ...row,
+      computedScore: computeScore(row.days, departIdx, threshold, tempThresh),
+    }));
+    scored.sort((a, b) => {
+      if (b.computedScore === null && a.computedScore === null) return b.dry_window - a.dry_window;
+      if (b.computedScore === null) return -1;
+      if (a.computedScore === null) return 1;
+      return b.computedScore - a.computedScore;
+    });
 
-    const bodyRows = rows.map(row => {
-      const dayCells = row.days.map(day => {
-        const rainCls = day.precip_prob <= threshold ? 'dry' : 'wet';
-        const hotCls  = day.temp_max > tempThreshold ? ' hot' : '';
-        const temp    = Math.round(day.temp_max);
-        return `<td class="col-day ${rainCls}${hotCls}">
-          <span class="emoji">${day.emoji}</span><br/>
-          <span class="temp">${temp}°F</span><br/>
-          <span class="precip">${day.precip_prob}%</span>
+    const sampleDays = rows[0].days;
+    const dayThs = sampleDays.map((d, i) => {
+      const dow = forecastDates[i] ? dayName(forecastDates[i]) : ('D' + (i + 1));
+      const md  = forecastDates[i] ? dateShort(forecastDates[i]) : '';
+      return `<th class="col-day bur-table-th">
+        <span class="bur-th-day-dow">${dow.toUpperCase()}</span>
+        <span class="bur-th-day-md">${md}</span>
+      </th>`;
+    }).join('');
+
+    const bodyRows = scored.map((row, ri) => {
+      const isTop  = ri < 3 && row.computedScore !== null;
+      const sel    = row.name === focusName;
+      const dayCells = row.days.map((day, i) => {
+        const dry = day.precip_prob <= threshold;
+        const hot = day.temp_max > tempThresh;
+        let cls = 'col-day';
+        if (hot)       cls += ' col-day--hot';
+        else if (dry)  cls += ' col-day--dry';
+        else           cls += ' col-day--wet';
+        const heatTag = hot ? '<div class="bur-cell-heat-tag">HEAT</div>' : '';
+        return `<td class="${cls}">
+          <div class="bur-cell-temp">${Math.round(day.temp_max)}°</div>
+          ${heatTag}
+          <div class="bur-cell-rain${dry ? '' : ' bur-cell-rain--wet'}">${day.precip_prob}%</div>
         </td>`;
       }).join('');
 
-      return `<tr>
-        <td class="col-dest">${row.name}</td>
-        <td class="col-dir">${row.direction}</td>
+      const scoreDisp = row.computedScore !== null
+        ? `<span class="${scoreClass(row.computedScore)}">${row.computedScore.toFixed(1)}</span>`
+        : `<span class="bur-score--none">—</span>`;
+
+      return `<tr class="${sel ? 'bur-row--focused' : ''}" data-name="${esc(row.name)}">
+        <td class="col-rank ${isTop ? 'col-rank--top' : ''}">${ri + 1}</td>
+        <td class="col-name">${esc(row.name)}</td>
+        <td class="col-dir">${row.direction.toUpperCase()}</td>
         ${dayCells}
-        <td class="col-dry dry-window">${row.dry_window}d</td>
+        <td class="col-dry ${dryClass(row.dry_window)}">${row.dry_window}D</td>
+        <td class="col-score">${scoreDisp}</td>
       </tr>`;
     }).join('');
 
+    const minW = Math.max(660, 380 + sampleDays.length * 60);
     gridContainer.innerHTML = `
-      <div class="table-wrapper">
-        <table class="forecast-table">
-          <thead>
-            <tr>
-              <th class="col-dest">Destination</th>
-              <th class="col-dir">Direction</th>
-              ${dayHeaders}
-              <th class="col-dry">Dry Window</th>
-            </tr>
-          </thead>
-          <tbody>${bodyRows}</tbody>
-        </table>
-      </div>
-    `;
+      <table class="bur-table" style="min-width:${minW}px;">
+        <thead>
+          <tr>
+            <th class="col-rank">#</th>
+            <th>Station</th>
+            <th>Bearing</th>
+            ${dayThs}
+            <th class="col-center">Dry</th>
+            <th class="col-right">Index</th>
+          </tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>`;
+
+    gridContainer.querySelectorAll('tbody tr').forEach(tr => {
+      tr.addEventListener('click', () => setFocus(tr.dataset.name));
+    });
   }
 
-  function tripScore(days, depIdx, threshold, tempThreshold) {
-    if (depIdx >= days.length) return null;
-    if (days[depIdx].precip_prob > threshold) return null;
-    const window = days.slice(depIdx, depIdx + 3);
-    const d0 = window[0] ? window[0].precip_prob : 0;
-    const d1 = window[1] ? window[1].precip_prob : 0;
-    const d2 = window[2] ? window[2].precip_prob : 0;
-    const rainPenalty = d0 * 0.50 + d1 * 0.35 + d2 * 0.15;
-    const weights = [0.50, 0.35, 0.15];
-    const heatPenalty = window.slice(0, 3).reduce((sum, day, j) =>
-      sum + Math.max(0, day.temp_max - tempThreshold) * weights[j] * 1.2, 0);
-    return Math.max(0, Math.round(100 - rainPenalty - heatPenalty));
-  }
+  /* ── SVG RADAR ── */
+  function renderRadar(rows) {
+    if (!radarContainer) return;
 
-  function renderRadar(rows, departureDay, threshold, tempThreshold) {
-    const canvas = document.getElementById('radar-chart');
-    if (!canvas || typeof Chart === 'undefined') return;
-
-    const depIdx = (departureDay || 1) - 1;
-
+    const threshold  = getThreshold();
+    const tempThresh = getTempThreshold();
     const dirMap = {};
     (rows || []).forEach(row => {
       const key   = row.direction.toLowerCase();
-      const score = tripScore(row.days, depIdx, threshold, tempThreshold);
+      const score = computeScore(row.days, departIdx, threshold, tempThresh);
       if (score === null) return;
       COMPASS.forEach(c => {
         if (c.match.includes(key)) {
@@ -252,105 +409,169 @@
       });
     });
 
-    const values   = COMPASS.map(c => dirMap[c.label] || 0);
-    const labels   = COMPASS.map(c => c.label);
-    const maxVal   = Math.max(...values, 1);
+    const values = COMPASS.map(c => dirMap[c.label] || 0);
+    const cx = 140, cy = 128, R = 92;
+    const ang = i => (i * 45) * Math.PI / 180;
+    const pt  = (i, r) => [cx + r * Math.sin(ang(i)), cy - r * Math.cos(ang(i))];
 
-    const bgColors = values.map(v => {
-      if (v === 0) return 'rgba(248,113,113,0.2)';
-      const ratio = v / maxVal;
-      const r = Math.round(248 - ratio * (248 - 74));
-      const g = Math.round(113 + ratio * (222 - 113));
-      const b = Math.round(113 - ratio * (113 - 128));
-      return `rgba(${r},${g},${b},0.45)`;
-    });
-    const borderColors = values.map(v => {
-      if (v === 0) return 'rgba(248,113,113,0.6)';
-      const ratio = v / maxVal;
-      const r = Math.round(248 - ratio * (248 - 74));
-      const g = Math.round(113 + ratio * (222 - 113));
-      const b = Math.round(113 - ratio * (113 - 128));
-      return `rgba(${r},${g},${b},1)`;
-    });
+    const poly = values.map((v, i) => pt(i, R * (v / 100)).join(',')).join(' ');
 
-    if (radarChart) {
-      radarChart.data.datasets[0].data       = values;
-      radarChart.data.datasets[0].backgroundColor = bgColors;
-      radarChart.data.datasets[0].borderColor    = borderColors;
-      radarChart.update();
-      return;
+    // concentric reference rings
+    const rings = [0.33, 0.66].map((f, k) => {
+      const pts = COMPASS.map((_, i) => pt(i, R * f).join(',')).join(' ');
+      return `<polygon points="${pts}" fill="none" stroke="#3a5a78" stroke-width="0.6" opacity="0.4"/>`;
+    }).join('');
+
+    // outer octagon
+    const outerPts = COMPASS.map((_, i) => pt(i, R).join(',')).join(' ');
+
+    // spoke lines
+    const spokes = COMPASS.map((_, i) => {
+      const [x, y] = pt(i, R);
+      return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#3a5a78" stroke-width="0.5" opacity="0.35"/>`;
+    }).join('');
+
+    // data polygon
+    const dataDots = values.map((v, i) => {
+      const [x, y] = pt(i, R * (v / 100));
+      return `<rect x="${x - 2}" y="${y - 2}" width="4" height="4" fill="#b2402c"/>`;
+    }).join('');
+
+    // direction labels
+    const labels = COMPASS.map((c, i) => {
+      const [x, y] = pt(i, R + 14);
+      return `<text x="${x}" y="${y + 3.5}" text-anchor="middle" font-family="Oswald,sans-serif" font-size="11" font-weight="600" fill="#23211c">${c.label}</text>`;
+    }).join('');
+
+    // best direction
+    const bestIdx = values.indexOf(Math.max(...values));
+    const bestDir = COMPASS[bestIdx].label;
+
+    radarContainer.innerHTML = `
+      <svg viewBox="0 0 280 268">
+        <circle cx="${cx}" cy="${cy}" r="${R}" fill="#eef0e6" stroke="#23211c" stroke-width="1.4"/>
+        ${rings}
+        ${spokes}
+        <polygon points="${poly}" fill="#2f6b4f" fill-opacity="0.18" stroke="#2f6b4f" stroke-width="1.8" stroke-linejoin="round"/>
+        ${dataDots}
+        ${labels}
+      </svg>
+      <div class="bur-radar-best">PEAK BEARING: <span>${bestDir}</span></div>`;
+  }
+
+  /* ── FOCUS ── */
+  function setFocus(name) {
+    focusName = name;
+    renderTripPlan(currentRows);
+    renderTable(currentRows);
+  }
+
+  /* ── MAIN REFRESH ── */
+  function refresh(force) {
+    const threshold    = getThreshold();
+    const tempThreshold = getTempThreshold();
+
+    gridContainer?.classList.add('bur-loading');
+    picksContainer?.classList.add('bur-loading');
+    if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.textContent = '↻ REFRESHING…'; }
+
+    fetch('/api/forecast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        threshold,
+        temp_threshold: tempThreshold,
+        horizon,
+        departure_day: departIdx + 1,
+        force: !!force,
+        origin_lat: originLat,
+        origin_lon: originLon,
+      }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.rows && data.rows[0]) {
+          forecastDates = data.rows[0].days.map(d => d.date);
+        }
+        currentRows = data.rows || [];
+
+        // if focused row is gone, reset
+        if (focusName && !currentRows.find(r => r.name === focusName)) {
+          focusName = null;
+        }
+
+        renderDepartBtns();
+        renderVerdict(data.top3);
+        renderTicker(currentRows, data.top3);
+        renderPicks(data.top3);
+        renderTripPlan(currentRows);
+        renderTable(currentRows);
+        renderRadar(currentRows);
+
+        if (stationCount) stationCount.textContent = currentRows.length;
+        if (lastUpdatedEl) lastUpdatedEl.textContent = data.last_updated;
+        if (lastUpdatedFt) lastUpdatedFt.textContent = data.last_updated;
+
+        gridContainer?.classList.remove('bur-loading');
+        picksContainer?.classList.remove('bur-loading');
+        if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = '↻ REFRESH'; }
+      })
+      .catch(() => {
+        gridContainer?.classList.remove('bur-loading');
+        picksContainer?.classList.remove('bur-loading');
+        if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = '↻ REFRESH'; }
+      });
+  }
+
+  /* ── ESCAPE HELPER ── */
+  function esc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /* ── EVENT WIRING ── */
+  thresholdInput?.addEventListener('input', () => {
+    if (thresholdVal) thresholdVal.textContent = thresholdInput.value + '%';
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => refresh(false), 300);
+  });
+
+  tempInput?.addEventListener('input', () => {
+    if (tempVal) tempVal.textContent = tempInput.value + '°F';
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => refresh(false), 300);
+  });
+
+  horizonBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      horizon = parseInt(btn.dataset.val, 10);
+      horizonBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      refresh(false);
+    });
+  });
+
+  refreshBtn?.addEventListener('click', () => refresh(true));
+
+  locationBtn?.addEventListener('click', () => {
+    const q = locationInput?.value.trim();
+    if (q) geocodeLocation(q);
+  });
+
+  locationInput?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const q = locationInput.value.trim();
+      if (q) geocodeLocation(q);
     }
-
-    radarChart = new Chart(canvas, {
-      type: 'radar',
-      data: {
-        labels,
-        datasets: [{
-          data: values,
-          backgroundColor: bgColors,
-          borderColor: borderColors,
-          borderWidth: 1.5,
-          pointBackgroundColor: borderColors,
-          pointRadius: 3,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        animation: { duration: 400 },
-        scales: {
-          r: {
-            min: 0,
-            ticks: {
-              stepSize: 1,
-              color: '#555',
-              backdropColor: 'transparent',
-              font: { size: 9 },
-            },
-            grid:        { color: '#2a2d3a' },
-            angleLines:  { color: '#2a2d3a' },
-            pointLabels: {
-              color: '#aaa',
-              font: { size: 12, weight: '600' },
-            },
-          },
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => ctx.raw > 0 ? ` score: ${ctx.raw}/100` : ' filtered (rain)',
-            },
-          },
-        },
-      },
-    });
-  }
-
-  thresholdInput.addEventListener('input', () => {
-    thresholdVal.textContent = thresholdInput.value + '%';
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(refresh, 300);
   });
 
-  tempThreshInput.addEventListener('input', () => {
-    tempThreshVal.textContent = tempThreshInput.value + '°F';
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(refresh, 300);
-  });
+  // auto-refresh every 30 min
+  setInterval(() => refresh(true), 30 * 60 * 1000);
 
-  depDayInput.addEventListener('input', () => {
-    updateDepLabel(parseInt(depDayInput.value, 10));
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(refresh, 300);
-  });
-
-  horizonInputs.forEach(r => r.addEventListener('change', () => refresh(false)));
-
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => refresh(true));
-  }
-
-  setInterval(() => refresh(true), AUTO_REFRESH_MS);
+  // boot
+  renderDepartBtns();
   refresh(false);
 })();

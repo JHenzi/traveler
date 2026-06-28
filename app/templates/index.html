@@ -39,6 +39,16 @@
     <aside class="bur-sidebar">
       <div class="bur-sidebar-hdr">Routing Parameters</div>
 
+      <div class="bur-ctl bur-ctl--padded">
+        <div class="bur-ctl-num bur-ctl-num--solo">00 / YOUR LOCATION</div>
+        <div class="bur-location-row">
+          <input type="text" id="location-input" class="bur-location-input"
+            placeholder="City, state or zip…" value="Cincinnati, OH" autocomplete="off" />
+          <button class="bur-location-btn" id="location-btn" title="Update location">&#8594;</button>
+        </div>
+        <div class="bur-location-status" id="location-status">Default: Cincinnati, OH</div>
+      </div>
+
       <div class="bur-ctl">
         <div class="bur-ctl-hdr">
           <span class="bur-ctl-num">01 / RAIN RISK TOLERANCE</span>
@@ -81,7 +91,7 @@
 
       <div class="bur-sidebar-status">
         <div class="bur-status-text">
-          TRANSMISSION OK. <span id="station-count">{{ rows | length }}</span> STATIONS REPORTING. RANK = TRIP QUALITY INDEX, 0&ndash;100.
+          STATUS: OK &mdash; <span id="station-count">{{ rows | length }}</span>
         </div>
         <div class="bur-refresh-row">
           <button class="bur-refresh-btn" id="refresh-btn">&#8635; REFRESH</button>
@@ -106,13 +116,17 @@
         </aside>
       </div>
 
-      <!-- TRIP PLAN -->
-      <div id="trip-plan-wrap"></div>
+      <!-- PARK FORECAST -->
+      <div id="trip-plan-wrap">
+        <div class="bur-trip-plan bur-trip-plan--empty">
+          <div class="bur-trip-empty-msg">&#9654; Click any row in the table below to see its full forecast here.</div>
+        </div>
+      </div>
 
       <!-- DATA SHEET -->
       <div class="bur-datasheet">
         <div class="bur-datasheet-hdr">
-          <div class="bur-section-label bur-section-label--ink">Station Data Sheet</div>
+          <div class="bur-section-label bur-section-label--ink">All Camps — Ranked by Forecast Quality</div>
           <div class="bur-datasheet-hint">SELECT ROW TO ROUTE &#9656;</div>
         </div>
         <div class="bur-scroll bur-table-wrap" id="grid-container">

@@ -1,40 +1,30 @@
 {% if top3 %}
-<h2 class="section-label">Trip Quality Rankings — Departing Day {{ departure_day }}</h2>
-<div class="top3-cards">
+<div class="bur-picks">
   {% for rec in top3 %}
-  {% set rank = loop.index %}
-  <div class="rec-card {% if rank == 1 %}rec-best{% endif %}">
-    <div class="rec-rank">
-      {% if rank == 1 %}#1 Best Match{% elif rank == 2 %}#2{% else %}#3{% endif %}
+  {% set i = loop.index0 %}
+  <button class="bur-pick-card{% if i == 0 %} bur-pick-card--top{% endif %}" data-name="{{ rec.name }}">
+    <div class="bur-pick-tag">
+      <span>A-{{ loop.index }}</span>
+      <span class="bur-pick-tag-dir">{{ rec.direction | upper }}</span>
     </div>
-    <div class="rec-name">{{ rec.name }}</div>
-    <div class="rec-dir">{{ rec.direction }}</div>
-    <div class="rec-score">
-      <span class="score-num">{{ rec.score }}</span>
-      <span class="score-label">/ 100</span>
-    </div>
-    {% set dep = rec.departure_day - 1 %}
-    <div class="rec-window-row">
-      {% for i in range(3) %}
-        {% if dep + i < rec.days | length %}
-        {% set day = rec.days[dep + i] %}
-        {% set w = [50, 35, 15][i] %}
-        <div class="rec-day {% if day.precip_prob <= threshold %}dry{% else %}wet{% endif %}{% if day.temp_max > temp_threshold %} hot{% endif %}">
-          <span class="rec-day-label">Day +{{ i }}</span>
-          <span class="rec-day-emoji">{{ day.emoji }}</span>
-          <span class="rec-day-temp">{{ day.temp_max | round(0) | int }}°F</span>
-          <span class="rec-day-precip">{{ day.precip_prob }}%</span>
-          <span class="rec-day-weight">×{{ w }}%</span>
+    <div class="bur-pick-body">
+      <div class="bur-pick-name">{{ rec.name }}</div>
+      <div class="bur-pick-foot">
+        <div>
+          <span class="bur-pick-score">{{ rec.score }}</span>
+          <span class="bur-pick-score-denom">/100</span>
         </div>
-        {% endif %}
-      {% endfor %}
+        <div class="bur-pick-meta">
+          <div>{{ rec.dry_window }}D DRY</div>
+        </div>
+      </div>
     </div>
-    <div class="rec-dry-window">Dry window: {{ rec.dry_window }}d</div>
-  </div>
+  </button>
   {% endfor %}
 </div>
 {% else %}
-<div class="top3-empty">
-  No destinations pass the rain filter for Day {{ departure_day }} at {{ threshold }}% threshold. Try raising the tolerance or choosing a different departure day.
+<div class="bur-picks-empty">
+  NO QUALIFYING ROUTES FOR CURRENT PARAMETERS.
+  RAISE RAIN TOLERANCE OR SELECT A DIFFERENT DEPARTURE DAY.
 </div>
 {% endif %}
