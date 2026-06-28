@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>National Camp Forecast Bureau | Free Camping Weather Tool | The Henzi Foundation</title>
+  <meta name="description" content="Find the driest campground near you. The National Camp Forecast Bureau ranks thousands of US campgrounds by 10-day forecast quality — rain risk, heat ceiling, and dry-window scoring. Free community tool from The Henzi Foundation.">
+  <link rel="canonical" href="https://henzi.org/camp-forecast.html" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://henzi.org/camp-forecast.html" />
+  <meta property="og:title" content="National Camp Forecast Bureau — Find the Driest Campground Near You" />
+  <meta property="og:description" content="Enter your location and see thousands of campgrounds ranked by 10-day forecast quality. Free community tool from The Henzi Foundation." />
+  <meta property="og:image" content="https://henzi.org/images/camp-forecast-preview.png" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="National Camp Forecast Bureau — Find the Driest Campground Near You" />
+  <meta name="twitter:description" content="Enter your location and see thousands of campgrounds ranked by 10-day forecast quality. Free community tool from The Henzi Foundation." />
+  <meta name="twitter:image" content="https://henzi.org/images/camp-forecast-preview.png" />
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "NGO",
+    "name": "The Henzi Foundation",
+    "url": "https://henzi.org",
+    "logo": "https://henzi.org/images/henzi%20logo%20150px.jpg",
+    "description": "A 501(c)(3) nonprofit providing financial assistance for funeral costs to families who have lost a child.",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Cincinnati",
+      "addressRegion": "OH",
+      "addressCountry": "US"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "National Camp Forecast Bureau",
+    "url": "https://travel.henzi.org",
+    "creator": { "@type": "Organization", "name": "The Henzi Foundation" },
+    "description": "Free tool that ranks US campgrounds by 10-day forecast quality — rain risk, heat ceiling, and dry-window scoring.",
+    "applicationCategory": "TravelApplication",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
+
+  <!-- Fonts + styles from henzi.org -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@300;400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://henzi.org/css/styles.css" />
+
+  <style>
+    /* page-local overrides */
+    .forecast-hero {
+      background: linear-gradient(135deg, var(--royal-blue) 0%, #2a5298 50%, var(--hunter-green) 100%);
+      color: white;
+      padding: 80px 20px 60px;
+      text-align: center;
+    }
+    .forecast-hero h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.8rem;
+      color: white;
+      margin-bottom: 20px;
+      line-height: 1.2;
+    }
+    .forecast-hero .lead-text {
+      font-size: 1.25rem;
+      max-width: 700px;
+      margin: 0 auto 40px;
+      opacity: 0.93;
+      line-height: 1.7;
+    }
+    .forecast-hero .btn-cta {
+      background: white;
+      color: var(--royal-blue);
+      padding: 18px 42px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      border-radius: 5px;
+      text-decoration: none;
+      display: inline-block;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .forecast-hero .btn-cta:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    }
+    .forecast-hero .btn-cta-secondary {
+      color: white;
+      border: 2px solid rgba(255,255,255,0.7);
+      padding: 16px 32px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 5px;
+      text-decoration: none;
+      display: inline-block;
+      margin-left: 16px;
+      transition: background 0.2s;
+    }
+    .forecast-hero .btn-cta-secondary:hover {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .screenshot-wrap {
+      max-width: 960px;
+      margin: -30px auto 0;
+      padding: 0 20px;
+      position: relative;
+      z-index: 10;
+    }
+    .screenshot-wrap img {
+      width: 100%;
+      height: auto;
+      border-radius: 6px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      border: 1px solid rgba(0,0,0,0.08);
+      display: block;
+    }
+    .screenshot-caption {
+      text-align: center;
+      color: var(--warm-gray);
+      font-size: 0.9rem;
+      margin-top: 12px;
+      font-style: italic;
+    }
+
+    .features-section {
+      padding: 70px 20px 50px;
+      background: var(--brand-soft);
+    }
+    .features-section h2 {
+      text-align: center;
+      color: var(--royal-blue);
+      font-size: 2.2rem;
+      margin-bottom: 50px;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 28px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .feature-card {
+      background: white;
+      padding: 30px;
+      border-top: 4px solid var(--hunter-green);
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.07);
+    }
+    .feature-card .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 14px;
+      display: block;
+    }
+    .feature-card h3 {
+      color: var(--royal-blue);
+      margin: 0 0 12px;
+      font-size: 1.2rem;
+    }
+    .feature-card p {
+      color: var(--warm-gray);
+      font-size: 1rem;
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .how-section {
+      padding: 70px 20px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    .how-section h2 {
+      color: var(--royal-blue);
+      font-size: 2.2rem;
+      margin-bottom: 10px;
+    }
+    .how-section .lead-text {
+      font-size: 1.1rem;
+      color: var(--warm-gray);
+      margin-bottom: 40px;
+    }
+    .steps {
+      counter-reset: steps;
+    }
+    .step {
+      display: flex;
+      gap: 22px;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    .step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .step-num {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      background: var(--royal-blue);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin-top: 2px;
+    }
+    .step-body h3 { color: var(--royal-blue); margin: 0 0 8px; font-size: 1.15rem; }
+    .step-body p { margin: 0; color: var(--text-main); line-height: 1.7; }
+
+    .mission-bridge {
+      background: var(--royal-blue);
+      color: white;
+      padding: 70px 20px;
+      text-align: center;
+    }
+    .mission-bridge h2 {
+      color: white;
+      font-size: 2.2rem;
+      margin-bottom: 20px;
+    }
+    .mission-bridge p {
+      font-size: 1.15rem;
+      line-height: 1.8;
+      max-width: 760px;
+      margin: 0 auto 30px;
+      opacity: 0.95;
+    }
+    .mission-bridge p strong { color: #FFD700; }
+    .mission-bridge .btn-donate {
+      background: #FFD700;
+      color: var(--royal-blue);
+      padding: 16px 40px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 5px;
+      text-decoration: none;
+      display: inline-block;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .mission-bridge .btn-donate:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+    .mission-bridge .btn-learn {
+      color: white;
+      border: 2px solid rgba(255,255,255,0.6);
+      padding: 14px 30px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 5px;
+      text-decoration: none;
+      display: inline-block;
+      margin-left: 16px;
+      transition: background 0.2s;
+    }
+    .mission-bridge .btn-learn:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .links-section {
+      padding: 60px 20px;
+      background: var(--brand-soft);
+    }
+    .links-section h2 {
+      text-align: center;
+      color: var(--royal-blue);
+      font-size: 2rem;
+      margin-bottom: 40px;
+    }
+    .links-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    @media (max-width: 700px) {
+      .links-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 400px) {
+      .links-grid { grid-template-columns: 1fr; }
+    }
+    .link-card {
+      background: white;
+      padding: 28px 24px;
+      border: 2px solid var(--royal-blue);
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.08);
+      text-align: center;
+      text-decoration: none;
+      color: var(--royal-blue);
+      display: block;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .link-card:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 rgba(0,0,0,0.12);
+      color: var(--hunter-green);
+    }
+    .link-card .link-icon { font-size: 1.8rem; display: block; margin-bottom: 10px; }
+    .link-card strong { display: block; font-size: 1.05rem; margin-bottom: 6px; }
+    .link-card span { font-size: 0.9rem; color: var(--warm-gray); }
+
+    @media (max-width: 768px) {
+      .forecast-hero h1 { font-size: 2rem; }
+      .forecast-hero .lead-text { font-size: 1.1rem; }
+      .forecast-hero .btn-cta-secondary { margin-left: 0; margin-top: 12px; display: block; }
+      .mission-bridge .btn-learn { margin-left: 0; margin-top: 12px; display: block; }
+      .how-section { padding: 50px 20px; }
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="header-placeholder"></div>
+
+<main class="page-content">
+
+  <!-- HERO -->
+  <div class="forecast-hero">
+    <h1>National Camp Forecast Bureau</h1>
+    <p class="lead-text">
+      Find the driest campground near you. Enter your location and our Bureau ranks thousands of
+      US campgrounds by 10-day forecast quality — rain risk, heat ceiling, and dry-window scoring.
+      Free, for everyone.
+    </p>
+    <div>
+      <a href="https://travel.henzi.org" target="_blank" rel="noopener noreferrer" class="btn-cta">
+        Open the Bureau &rarr;
+      </a>
+      <a href="https://henzi.org/donate.html" class="btn-cta-secondary">
+        Support Our Mission
+      </a>
+    </div>
+  </div>
+
+  <!-- SCREENSHOT -->
+  <div class="screenshot-wrap">
+    <img src="https://henzi.org/images/camp-forecast-preview.png"
+         alt="National Camp Forecast Bureau — campground weather ranking interface"
+         width="1400" height="820" />
+    <p class="screenshot-caption">
+      Campgrounds ranked by forecast quality — Buck Creek SP leading with 6 dry days from departure.
+    </p>
+  </div>
+
+  <!-- FEATURE CARDS -->
+  <section class="features-section">
+    <h2>What It Does</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <span class="feature-icon">&#127961;</span>
+        <h3>Any US Location</h3>
+        <p>Enter your city, zip, or address. The Bureau geocodes it and finds campgrounds within your chosen radius — 50 to 500 miles.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#9925;</span>
+        <h3>10-Day Forecasts, Pre-Cached</h3>
+        <p>Forecasts for thousands of campgrounds are refreshed every 6 hours in the background. Zero waiting — results are instant.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#127774;</span>
+        <h3>Dry-Window Scoring</h3>
+        <p>Each campground gets a Trip Quality Index (0–100) based on rain probability and heat over your 3-day departure window.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#127777;</span>
+        <h3>Heat Ceiling Alerts</h3>
+        <p>Set your comfort threshold. Days that exceed it are flagged amber across the forecast grid so you can spot conflicts at a glance.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#9096;</span>
+        <h3>Directional Scope</h3>
+        <p>An octagonal radar chart shows which compass direction from your origin has the best combined dry-window score.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#128205;</span>
+        <h3>Thousands of Campgrounds</h3>
+        <p>Data from Recreation.gov federal parks (RIDB) and OpenStreetMap, covering National Forests, state parks, and private sites.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how-section">
+    <h2>How It Works</h2>
+    <p class="lead-text">No API keys, no account, no cost. Just enter your location and go.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Enter Your Location</h3>
+          <p>Type any city, state, or zip code. The tool geocodes it using OpenStreetMap's Nominatim — no Google Maps, no tracking.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Set Your Parameters</h3>
+          <p>Adjust rain tolerance, heat ceiling, forecast horizon (5/7/10 days), departure day, and search radius from the sidebar. Every change re-ranks instantly.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Read the Dispatch</h3>
+          <p>The top 3 campgrounds are surfaced as Priority Dispatch cards. Click any row in the data table to see its full 10-day forecast panel.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>Go Camp</h3>
+          <p>You've found your window. Pack the rain fly anyway — the Bureau recommends, nature decides.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MISSION BRIDGE -->
+  <section class="mission-bridge">
+    <div style="max-width: 820px; margin: 0 auto;">
+      <h2>A Community Service of The Henzi Foundation</h2>
+      <p>
+        The Henzi Foundation is a <strong>501(c)(3) nonprofit</strong> based in Cincinnati, Ohio.
+        Our primary mission is providing <strong>financial assistance for child funeral costs</strong>
+        to families in crisis — because no parent should face that burden alone.
+      </p>
+      <p>
+        The National Camp Forecast Bureau is a free community tool we built and maintain because
+        we believe in investing in the communities that support us. If it helps your family
+        plan a better trip, consider paying it forward. Every dollar we raise goes directly
+        toward families who have lost a child.
+      </p>
+      <div>
+        <a href="https://henzi.org/donate.html" class="btn-donate">
+          Donate to The Henzi Foundation
+        </a>
+        <a href="https://henzi.org/mission.html" class="btn-learn">
+          Learn About Our Mission
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- HELPFUL LINKS -->
+  <section class="links-section">
+    <h2>More from The Henzi Foundation</h2>
+    <div class="links-grid">
+      <a href="https://henzi.org/faq.html" class="link-card">
+        <span class="link-icon">&#10067;</span>
+        <strong>FAQ</strong>
+        <span>How we help families, who qualifies, and how to apply</span>
+      </a>
+      <a href="https://henzi.org/resources.html" class="link-card">
+        <span class="link-icon">&#128218;</span>
+        <strong>Resources</strong>
+        <span>Support and guidance for grieving parents</span>
+      </a>
+      <a href="https://henzi.org/research.html" class="link-card">
+        <span class="link-icon">&#128202;</span>
+        <strong>Research &amp; Data</strong>
+        <span>The real cost of child funerals and why families need help</span>
+      </a>
+      <a href="https://henzi.org/donate.html" class="link-card">
+        <span class="link-icon">&#10084;</span>
+        <strong>Donate</strong>
+        <span>Help cover the cost of a child's funeral for a family in need</span>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<!-- FOOTER (matches henzi.org) -->
+<footer>
+  <div class="container">
+    <div class="footer-content">
+      <div class="footer-logo">
+        <h3>The Henzi Foundation</h3>
+        <p>501(c)(3) Nonprofit &mdash; Cincinnati, OH</p>
+        <p style="font-size: 0.85rem; color: #999;">EIN: on file &mdash; donations are tax-deductible</p>
+        <div class="social-links">
+          <a href="https://www.facebook.com/HenziFoundation" aria-label="Facebook" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          </a>
+          <a href="https://www.instagram.com/henzifoundation/" aria-label="Instagram" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+          </a>
+        </div>
+      </div>
+      <div class="footer-links">
+        <div class="footer-column">
+          <h4>Foundation</h4>
+          <a href="https://henzi.org/mission.html">Our Mission</a>
+          <a href="https://henzi.org/foundation.html">Team</a>
+          <a href="https://henzi.org/research.html">Research &amp; Data</a>
+          <a href="https://henzi.org/donate.html">Donate</a>
+        </div>
+        <div class="footer-column">
+          <h4>Support</h4>
+          <a href="https://henzi.org/resources.html">Resources for Families</a>
+          <a href="https://henzi.org/faq.html">FAQ</a>
+          <a href="https://henzi.org/charities.html">Local Charities</a>
+          <a href="https://henzi.org/contact-us.html">Contact Us</a>
+        </div>
+        <div class="footer-column">
+          <h4>Community Tools</h4>
+          <a href="https://travel.henzi.org" target="_blank" rel="noopener noreferrer">Camp Forecast Bureau</a>
+          <a href="https://robot.henzi.org" target="_blank" rel="noopener noreferrer">Robot Diary</a>
+          <a href="https://henzi.org/news.html">News &amp; Updates</a>
+        </div>
+      </div>
+    </div>
+    <p style="color: #888; font-size: 0.85rem; margin-top: 20px;">
+      &copy; 2024 The Henzi Foundation. All rights reserved.
+      The National Camp Forecast Bureau is a free community service. Weather data via
+      <a href="https://open-meteo.com" style="color: #aaa;" target="_blank" rel="noopener noreferrer">Open-Meteo</a>.
+      Campground data via <a href="https://ridb.recreation.gov" style="color: #aaa;" target="_blank" rel="noopener noreferrer">Recreation.gov</a>
+      and <a href="https://www.openstreetmap.org" style="color: #aaa;" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>.
+    </p>
+  </div>
+</footer>
+
+<script>
+  // Nav mobile toggle (matches henzi.org pattern)
+  const menuToggle = document.querySelector('.menu-toggle');
+  const navMenu = document.getElementById('nav-menu');
+  if (menuToggle && navMenu) {
+    menuToggle.addEventListener('click', () => navMenu.classList.toggle('active'));
+  }
+  // Dropdown hover on desktop is CSS-driven; this handles keyboard/click for accessibility
+  document.querySelectorAll('.nav-dropdown').forEach(dropdown => {
+    dropdown.addEventListener('click', e => {
+      if (e.target.closest('.dropdown-toggle')) dropdown.classList.toggle('active');
+    });
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.nav-dropdown')) {
+      document.querySelectorAll('.nav-dropdown').forEach(d => d.classList.remove('active'));
+    }
+  });
+</script>
+
+</body>
+</html>
