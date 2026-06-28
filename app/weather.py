@@ -4,7 +4,7 @@ from . import db
 
 log = logging.getLogger(__name__)
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
-BATCH_SIZE = 300  # Open-Meteo practical limit per request
+BATCH_SIZE = 100  # keeps GET URLs well under server URI limits (~2.6KB at 100 coords)
 
 # Conservative self-imposed cap: 200 Open-Meteo calls/hour.
 # Their free tier has no published hard limit, but this keeps us polite.
