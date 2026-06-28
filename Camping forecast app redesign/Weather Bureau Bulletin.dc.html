@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  ::selection{background:#b2402c30;}
+  .bur-scroll::-webkit-scrollbar{height:10px;width:10px;}
+  .bur-scroll::-webkit-scrollbar-thumb{background:#a89c78;}
+  .bur-scroll::-webkit-scrollbar-track{background:#d8d0b8;}
+  input[type=range]{accent-color:#b2402c;}
+</style>
+</helmet>
+<div style="min-height:100%;background:#cfc8b0;background-image:linear-gradient(rgba(58,90,120,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(58,90,120,.10) 1px,transparent 1px);background-size:22px 22px;font-family:'Space Mono',monospace;color:#23211c;padding:24px 16px 46px;">
+<div style="max-width:1240px;margin:0 auto;background:#e7e1cf;border:2px solid #23211c;">
+
+  <!-- HEADER BAR -->
+  <div style="display:flex;align-items:stretch;border-bottom:2px solid #23211c;">
+    <div style="flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 22px;background:#23211c;color:#e7e1cf;font-family:'Oswald';font-weight:700;font-size:34px;letter-spacing:.04em;">WX</div>
+    <div style="flex:1;padding:13px 20px;border-right:2px solid #23211c;">
+      <div style="font-family:'Oswald';font-weight:600;font-size:25px;letter-spacing:.05em;line-height:1;text-transform:uppercase;">National Camp Forecast Bureau</div>
+      <div style="font-size:11.5px;letter-spacing:.08em;color:#6f6852;margin-top:5px;">DRY-WINDOW DISPATCH &nbsp;/&nbsp; ESCAPE-THE-RAIN ROUTING &nbsp;/&nbsp; STATION: CINCINNATI OH (KCVG)</div>
+    </div>
+    <div style="flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;padding:0 18px;text-align:right;">
+      <div style="font-size:10px;letter-spacing:.1em;color:#6f6852;">BULLETIN No.</div>
+      <div style="font-family:'Oswald';font-weight:600;font-size:20px;">26-179</div>
+      <div style="display:inline-block;margin-top:5px;border:1.5px solid #b2402c;color:#b2402c;font-size:9.5px;font-weight:700;letter-spacing:.12em;padding:2px 6px;transform:rotate(-3deg);">FILED 06&middot;28</div>
+    </div>
+  </div>
+
+  <!-- TICKER -->
+  <div style="border-bottom:2px solid #23211c;background:#23211c;color:#e7e1cf;padding:6px 18px;font-size:11px;letter-spacing:.06em;display:flex;gap:26px;overflow:hidden;white-space:nowrap;">
+    <span style="color:#e8b04a;">&#9632; ADVISORY</span><span>{{ ticker }}</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:270px 1fr;align-items:start;">
+
+    <!-- CONTROL FORM -->
+    <aside style="border-right:2px solid #23211c;padding:0;background:#ded7bf;">
+      <div style="background:#23211c;color:#e7e1cf;padding:8px 16px;font-family:'Oswald';font-weight:500;font-size:13px;letter-spacing:.18em;text-transform:uppercase;">Routing Parameters</div>
+
+      <div style="padding:16px 16px 6px;border-bottom:1.5px solid #23211c40;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="font-size:11px;letter-spacing:.06em;color:#6f6852;">01 / RAIN RISK TOLERANCE</span>
+          <span style="font-family:'Oswald';font-weight:700;font-size:18px;color:#b2402c;">{{ rainTol }}%</span>
+        </div>
+        <input type="range" min="0" max="90" step="5" value="{{ rainTol }}" onInput="{{ onRain }}" style="width:100%;height:4px;margin:9px 0 4px;" />
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:#9a8e6e;letter-spacing:.06em;margin-bottom:12px;"><span>0 / DRY</span><span>90 / WET OK</span></div>
+      </div>
+
+      <div style="padding:16px 16px 6px;border-bottom:1.5px solid #23211c40;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="font-size:11px;letter-spacing:.06em;color:#6f6852;">02 / HEAT CEILING</span>
+          <span style="font-family:'Oswald';font-weight:700;font-size:18px;color:#b2402c;">{{ maxTemp }}&deg;F</span>
+        </div>
+        <input type="range" min="78" max="100" step="1" value="{{ maxTemp }}" onInput="{{ onTemp }}" style="width:100%;height:4px;margin:9px 0 4px;" />
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:#9a8e6e;letter-spacing:.06em;margin-bottom:12px;"><span>78&deg;</span><span>100&deg;</span></div>
+      </div>
+
+      <div style="padding:16px 16px;border-bottom:1.5px solid #23211c40;">
+        <div style="font-size:11px;letter-spacing:.06em;color:#6f6852;margin-bottom:9px;">03 / FORECAST HORIZON</div>
+        <div style="display:flex;gap:0;border:1.5px solid #23211c;">
+          <sc-for list="{{ horizonOpts }}" as="opt" hint-placeholder-count="3">
+            <button onClick="{{ opt.set }}" style="{{ opt.style }}">{{ opt.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="padding:16px 16px;">
+        <div style="font-size:11px;letter-spacing:.06em;color:#6f6852;margin-bottom:9px;">04 / DEPARTURE DAY</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
+          <sc-for list="{{ departDays }}" as="d" hint-placeholder-count="7">
+            <button onClick="{{ d.set }}" style="{{ d.style }}"><span style="font-family:'Oswald';font-weight:600;font-size:12px;">{{ d.dow }}</span><span style="font-size:8.5px;opacity:.7;">{{ d.md }}</span></button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="padding:0 16px 18px;">
+        <div style="border:1.5px dashed #23211c50;padding:10px 12px;font-size:10.5px;line-height:1.6;color:#6f6852;">
+          TRANSMISSION OK. {{ count }} STATIONS REPORTING. RANK = TRIP QUALITY INDEX, 0&ndash;100.
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main style="padding:0;min-width:0;">
+
+      <div style="display:grid;grid-template-columns:1fr 300px;align-items:stretch;border-bottom:2px solid #23211c;">
+        <!-- PRIORITY DISPATCH -->
+        <section style="padding:18px 22px;border-right:2px solid #23211c;min-width:0;">
+          <div style="font-family:'Oswald';font-weight:600;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:#b2402c;margin-bottom:2px;">Priority Dispatch</div>
+          <h2 style="font-family:'Oswald';font-weight:500;font-size:21px;letter-spacing:.01em;margin:0 0 15px;line-height:1.12;text-transform:uppercase;">{{ verdictLine }}</h2>
+          <div>{{ picks }}</div>
+        </section>
+        <!-- RADAR SCOPE -->
+        <aside style="padding:14px 16px 10px;background:#ded7bf;">
+          <div style="font-family:'Oswald';font-weight:600;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;text-align:center;margin-bottom:4px;">Directional Scope</div>
+          <div>{{ radar }}</div>
+        </aside>
+      </div>
+
+      <!-- TRIP PLAN -->
+      <div style="padding:18px 22px;border-bottom:2px solid #23211c;">{{ tripPlan }}</div>
+
+      <!-- DATA SHEET -->
+      <div style="padding:16px 22px 22px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
+          <div style="font-family:'Oswald';font-weight:600;font-size:13px;letter-spacing:.2em;text-transform:uppercase;">Station Data Sheet</div>
+          <div style="font-size:10px;letter-spacing:.08em;color:#6f6852;">SELECT ROW TO ROUTE &#9656;</div>
+        </div>
+        <div class="bur-scroll" style="overflow-x:auto;border:1.5px solid #23211c;">{{ table }}</div>
+        <div style="margin-top:14px;display:flex;justify-content:space-between;font-size:9.5px;letter-spacing:.1em;color:#6f6852;text-transform:uppercase;">
+          <span>End of transmission</span><span>Sample data for layout</span><span>Travel Tools &middot; Bureau Series</span>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1240,&quot;height&quot;:900},&quot;accentInk&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#b2402c&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Bureau&quot;,&quot;options&quot;:[&quot;#b2402c&quot;,&quot;#2d4a6b&quot;,&quot;#2f6b4f&quot;,&quot;#7a4a1f&quot;]},&quot;highlightWindow&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Bureau&quot;}}">
+class Component extends DCLogic {
+  state = { ready:false, rainTol:50, maxTemp:84, horizon:7, departIdx:0, focus:null };
+
+  async componentDidMount(){
+    try{ const m = await import('./forecast-data.js'); this.M = m; this.setState({ready:true}); }
+    catch(e){ console.error('data load failed', e); }
+  }
+
+  C = { paper:'#e7e1cf', panel:'#ded7bf', ink:'#23211c', soft:'#6f6852', red:'#b2402c', green:'#2f6b4f', blue:'#3a5a78', line:'rgba(35,33,28,.22)' };
+  set = (k,v)=>this.setState({[k]:v});
+  cols(){ const {departIdx,horizon}=this.state; const n=Math.min(horizon,14-departIdx);
+    return Array.from({length:n},(_,i)=>({i, ...this.M.dayMeta(departIdx+i)})); }
+
+  buildRadar(opts){
+    const h=React.createElement, cx=140,cy=128,R=92, C=this.C;
+    const data=this.M.radar(opts);
+    const ang=i=>(i*45)*Math.PI/180;
+    const pt=(i,r)=>[cx+r*Math.sin(ang(i)), cy-r*Math.cos(ang(i))];
+    const poly=data.map((d,i)=>pt(i,R*(d.value/100)).join(',')).join(' ');
+    const labels=['N','NE','E','SE','S','SW','W','NW'];
+    const els=[];
+    els.push(h('circle',{key:'face',cx,cy,r:R,fill:'#eef0e6',stroke:C.ink,strokeWidth:1.4}));
+    [0.66,0.33].forEach((f,k)=>els.push(h('circle',{key:'c'+k,cx,cy,r:R*f,fill:'none',stroke:C.blue,strokeWidth:0.6,opacity:0.4})));
+    data.forEach((d,i)=>{const[x,y]=pt(i,R);els.push(h('line',{key:'s'+i,x1:cx,y1:cy,x2:x,y2:y,stroke:C.blue,strokeWidth:0.5,opacity:0.35}));});
+    els.push(h('polygon',{key:'fill',points:poly,fill:C.green,fillOpacity:0.18,stroke:C.green,strokeWidth:1.8,strokeLinejoin:'round'}));
+    data.forEach((d,i)=>{const[x,y]=pt(i,R*(d.value/100));els.push(h('rect',{key:'d'+i,x:x-2,y:y-2,width:4,height:4,fill:C.red}));});
+    labels.forEach((L,i)=>{const[x,y]=pt(i,R+14);els.push(h('text',{key:'l'+i,x,y:y+3.5,textAnchor:'middle',fontFamily:'Oswald',fontSize:11,fontWeight:600,fill:C.ink},L));});
+    const best=[...data].sort((a,b)=>b.value-a.value)[0];
+    return h('div',{style:{textAlign:'center'}},
+      h('svg',{viewBox:'0 0 280 268',style:{width:'100%',display:'block'}},els),
+      h('div',{style:{fontSize:10,letterSpacing:'.08em',color:C.soft,marginTop:2}}, 'PEAK BEARING: ',
+        h('span',{style:{color:C.green,fontWeight:700}}, this.M.DIR_LABEL[best.dir].toUpperCase()))
+    );
+  }
+
+  buildPicks(ranked){
+    const h=React.createElement, C=this.C; const top=ranked.slice(0,3);
+    return h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px'}},
+      top.map((p,idx)=>h('button',{key:p.name,onClick:()=>this.set('focus',p.name),
+        style:{textAlign:'left',cursor:'pointer',background:idx===0?C.ink:'#eef0e6',color:idx===0?C.paper:C.ink,
+          border:'1.5px solid '+C.ink,padding:'0',font:'inherit',overflow:'hidden'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 9px',
+          background:idx===0?C.red:'transparent',color:idx===0?C.paper:C.soft,borderBottom:'1.5px solid '+(idx===0?C.red:C.ink)}},
+          h('span',{style:{fontFamily:'Oswald',fontWeight:700,fontSize:12,letterSpacing:'.1em'}}, 'A-'+(idx+1)),
+          h('span',{style:{fontSize:9.5,letterSpacing:'.08em'}}, p.dirLabel.toUpperCase())),
+        h('div',{style:{padding:'9px 10px 11px'}},
+          h('div',{style:{fontFamily:'Oswald',fontWeight:600,fontSize:idx===0?17:14.5,lineHeight:1.05,textTransform:'uppercase',marginBottom:7,minHeight:34}}, p.name),
+          h('div',{style:{display:'flex',alignItems:'flex-end',justifyContent:'space-between'}},
+            h('div',null,
+              h('span',{style:{fontFamily:'Oswald',fontWeight:700,fontSize:idx===0?32:25,color:idx===0?'#e8b04a':C.green}}, p.score.toFixed(1)),
+              h('span',{style:{fontSize:9,opacity:.6,marginLeft:2}}, '/100')),
+            h('div',{style:{textAlign:'right',fontSize:9.5,lineHeight:1.5,opacity:.85}},
+              h('div',null, p.dryWindow+'D DRY'),
+              h('div',null, '~'+p.drive.toFixed(1)+'H')))))
+    ));
+  }
+
+  buildPlan(ranked){
+    const h=React.createElement, C=this.C;
+    const f=this.state.focus; const p=(f && ranked.find(x=>x.name===f))||ranked[0];
+    const cols=this.cols();
+    const verdict = p.dryWindow>=5?'CLEAR \u2014 EXTENDED DRY WINDOW CONFIRMED.':p.dryWindow>=3?'MARGINAL \u2014 DRY EARLY, WATCH LATTER DAYS.':p.avgRain>50?'WET \u2014 ADVISE RAIN CONTINGENCY.':'VARIABLE \u2014 ROUTE WITH FLEXIBILITY.';
+    return h('div',null,
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:11,flexWrap:'wrap',gap:6}},
+        h('div',null,
+          h('span',{style:{fontFamily:'Oswald',fontWeight:600,fontSize:13,letterSpacing:'.2em',color:C.red,textTransform:'uppercase'}}, 'Routing Order \u2014 '),
+          h('span',{style:{fontFamily:'Oswald',fontWeight:600,fontSize:19,textTransform:'uppercase'}}, p.name)),
+        h('div',{style:{fontSize:11,color:C.soft}}, p.dirLabel.toUpperCase()+' \u00b7 '+Math.round(p.miles)+' MI \u00b7 ~'+p.drive.toFixed(1)+'H')),
+      h('div',{style:{display:'flex',gap:0,marginBottom:11,flexWrap:'wrap',border:'1.5px solid '+C.ink}},
+        cols.map((c,i)=>{const d=p.window[i]; if(!d)return null; const dry=d.rain<=this.state.rainTol;
+          const inWin=this.hl && i>=p.bestStart && i<p.bestStart+p.dryWindow;
+          return h('div',{key:i,style:{flex:'1 1 0',minWidth:52,textAlign:'center',padding:'6px 3px 5px',
+            borderRight:i<cols.length-1?'1px solid '+C.line:'none',background:inWin?'rgba(47,107,79,.12)':'transparent'}},
+            h('div',{style:{fontSize:8.5,letterSpacing:'.04em',color:C.soft}}, c.dow.toUpperCase()),
+            h('div',{style:{fontSize:8,color:C.soft,marginBottom:2}}, c.md),
+            h('div',{style:{fontFamily:'Oswald',fontWeight:600,fontSize:16,color:d.temp>this.state.maxTemp?C.red:C.ink}}, d.temp+'\u00b0'),
+            h('div',{style:{fontSize:10,fontWeight:700,color:dry?C.green:C.red}}, d.rain+'%'),
+            h('div',{style:{fontSize:7.5,letterSpacing:'.06em',color:C.soft,marginTop:1}}, d.code));
+        })),
+      h('div',{style:{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}},
+        h('span',{style:{display:'inline-block',background:p.dryWindow>=5?C.green:p.dryWindow>=3?C.ink:C.red,color:C.paper,fontSize:11,fontWeight:700,letterSpacing:'.08em',padding:'4px 10px'}}, verdict),
+        h('span',{style:{fontSize:11,color:C.soft}}, 'BEST WINDOW '+(cols[p.bestStart]?cols[p.bestStart].dow.toUpperCase()+' '+cols[p.bestStart].md:'\u2014')+' \u00b7 '+p.dryWindow+'D \u00b7 AVG RAIN '+p.avgRain+'%')));
+  }
+
+  buildTable(ranked){
+    const h=React.createElement, C=this.C; const cols=this.cols(); const rt=this.state.rainTol, mt=this.state.maxTemp;
+    const thBase={fontFamily:'Oswald',fontSize:10,fontWeight:600,letterSpacing:'.08em',color:C.paper,textTransform:'uppercase',padding:'7px 7px',textAlign:'left',whiteSpace:'nowrap'};
+    const head=h('tr',{style:{background:C.ink}},
+      h('th',{style:Object.assign({},thBase,{width:24,textAlign:'center',padding:'7px 2px'})},'#'),
+      h('th',{style:thBase},'Station'),
+      h('th',{style:thBase},'Bearing'),
+      cols.map(c=>h('th',{key:c.i,style:Object.assign({},thBase,{textAlign:'center',padding:'4px 4px',width:60,borderLeft:'1px solid #ffffff22'})},
+        h('div',{style:{fontWeight:600,fontSize:11}},c.dow.toUpperCase()),
+        h('div',{style:{fontSize:8,opacity:.7,fontFamily:'Space Mono'}},c.md))),
+      h('th',{style:Object.assign({},thBase,{textAlign:'center',borderLeft:'1px solid #ffffff22'})},'Dry'),
+      h('th',{style:Object.assign({},thBase,{textAlign:'right'})},'Index'));
+    const rows=ranked.map((p,ri)=>{
+      const sel=this.state.focus===p.name;
+      return h('tr',{key:p.name,onClick:()=>this.set('focus',p.name),
+        style:{cursor:'pointer',background:sel?'rgba(47,107,79,.15)':(ri%2?'rgba(35,33,28,.035)':'transparent')}},
+        h('td',{style:{textAlign:'center',padding:'0 2px',borderBottom:'1px solid '+C.line,
+          fontFamily:'Oswald',fontWeight:600,fontSize:11,color:ri<3?C.paper:C.soft,background:ri<3?C.red:'transparent'}}, ri+1),
+        h('td',{style:{padding:'6px 7px',borderBottom:'1px solid '+C.line,whiteSpace:'nowrap',fontFamily:'Oswald',fontWeight:500,fontSize:14,textTransform:'uppercase',letterSpacing:'.01em'}}, p.name),
+        h('td',{style:{padding:'6px 7px',borderBottom:'1px solid '+C.line,fontSize:10,color:C.soft,whiteSpace:'nowrap',letterSpacing:'.04em'}}, p.dirLabel.toUpperCase()),
+        cols.map((c,i)=>{const d=p.window[i]; const dry=d&&d.rain<=rt; const inWin=this.hl&&d&&i>=p.bestStart&&i<p.bestStart+p.dryWindow;
+          return h('td',{key:i,style:{padding:'4px 4px',borderBottom:'1px solid '+C.line,borderLeft:'1px solid '+C.line,textAlign:'center',
+            background:!d?'transparent':inWin?'rgba(47,107,79,.13)':dry?'rgba(47,107,79,.05)':'rgba(178,64,44,.06)'}},
+            d?[h('div',{key:'t',style:{fontFamily:'Oswald',fontWeight:600,fontSize:12,color:d.temp>mt?C.red:C.ink}}, d.temp+'\u00b0'),
+               h('div',{key:'r',style:{fontSize:9.5,fontWeight:700,color:dry?C.green:C.red}}, d.rain+'%')]:'\u00b7');
+        }),
+        h('td',{style:{padding:'6px 7px',borderBottom:'1px solid '+C.line,borderLeft:'1px solid '+C.line,textAlign:'center',
+          fontFamily:'Oswald',fontWeight:600,fontSize:12,color:p.dryWindow>=5?C.green:p.dryWindow>=3?C.ink:C.red}}, p.dryWindow+'D'),
+        h('td',{style:{padding:'6px 8px 6px 6px',borderBottom:'1px solid '+C.line,textAlign:'right'}},
+          h('span',{style:{fontFamily:'Oswald',fontWeight:700,fontSize:16,color:p.score>=85?C.green:p.score>=72?C.ink:C.red}}, p.score.toFixed(1))));
+    });
+    return h('table',{style:{borderCollapse:'collapse',width:'100%',minWidth:Math.max(660,380+cols.length*60)}},
+      h('thead',null,head), h('tbody',null,rows));
+  }
+
+  renderVals(){
+    this.C = { ...this.C, red: this.props.accentInk || this.C.red };
+    this.hl = this.props.highlightWindow !== false;
+    const C=this.C;
+    const horizonOpts=[5,7,10].map(v=>({label:v+'-DAY',set:()=>this.set('horizon',v),
+      style:`flex:1;padding:7px 0;font:inherit;font-family:'Oswald';font-weight:600;font-size:12px;letter-spacing:.06em;cursor:pointer;border:none;border-right:${v===10?'none':'1.5px solid '+C.ink};background:${this.state.horizon===v?C.ink:'transparent'};color:${this.state.horizon===v?C.paper:C.ink};`}));
+    const dayStyle=(active)=>`display:flex;flex-direction:column;align-items:center;gap:0;padding:6px 2px;font:inherit;cursor:pointer;border:1.4px solid ${C.ink};background:${active?C.red:'transparent'};color:${active?C.paper:C.ink};`;
+    if(!this.M){
+      const ph=Array.from({length:7},()=>({dow:'',md:'',set:()=>{},style:dayStyle(false)}));
+      return { rainTol:this.state.rainTol, maxTemp:this.state.maxTemp,
+        onRain:e=>this.set('rainTol',+e.target.value), onTemp:e=>this.set('maxTemp',+e.target.value),
+        horizonOpts, departDays:ph, ticker:'ESTABLISHING UPLINK\u2026', verdictLine:'Compiling dispatch\u2026',
+        picks:'', radar:'', tripPlan:'', table:'', count:'\u2014' };
+    }
+    const opts={rainTol:this.state.rainTol,maxTemp:this.state.maxTemp,horizon:this.state.horizon,departIdx:this.state.departIdx};
+    const ranked=this.M.rank(opts);
+    const departDays=Array.from({length:7},(_,i)=>{const m=this.M.dayMeta(i);
+      return {dow:m.dow,md:m.md,set:()=>this.set('departIdx',i),style:dayStyle(this.state.departIdx===i)};});
+    const top=ranked[0];
+    const verdictLine = 'Route '+top.dirLabel+' \u2014 '+top.name+' holds '+top.dryWindow+' dry days.';
+    const wet=this.M.rank(opts).filter(x=>x.avgRain>55).length;
+    const ticker = 'Wet front anchored over the SOUTH & SOUTHEAST \u00b7 '+wet+' stations advise rain plans \u00b7 driest air to the '+top.dirLabel.toUpperCase()+' \u00b7 heat ceiling holding near '+this.state.maxTemp+'\u00b0F \u00b7 next update 06\u00b729 0600Z';
+    return {
+      rainTol:this.state.rainTol, maxTemp:this.state.maxTemp,
+      onRain:e=>this.set('rainTol',+e.target.value), onTemp:e=>this.set('maxTemp',+e.target.value),
+      horizonOpts, departDays, ticker, verdictLine, count:ranked.length,
+      picks:this.buildPicks(ranked), radar:this.buildRadar(opts),
+      tripPlan:this.buildPlan(ranked), table:this.buildTable(ranked),
+    };
+  }
+}
+</script>
+</body>
+</html>

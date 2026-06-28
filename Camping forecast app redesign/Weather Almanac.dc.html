@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Spectral:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  ::selection{background:#9e3b2233;}
+  .alm-scroll::-webkit-scrollbar{height:10px;width:10px;}
+  .alm-scroll::-webkit-scrollbar-thumb{background:#c9b48b;border-radius:0;}
+  .alm-scroll::-webkit-scrollbar-track{background:#e7d9b8;}
+  input[type=range]{accent-color:#9e3b22;}
+</style>
+</helmet>
+<div style="min-height:100%;background:#cdbe98;background-image:radial-gradient(#00000008 1px,transparent 1px);background-size:4px 4px;font-family:'Spectral',Georgia,serif;color:#2a2018;padding:26px 18px 48px;">
+<div style="max-width:1220px;margin:0 auto;background:#f4ecd6;border:1.5px solid #2a2018;box-shadow:0 18px 50px -22px #00000066;">
+
+  <!-- MASTHEAD -->
+  <div style="padding:22px 30px 16px;border-bottom:3px double #2a2018;text-align:center;position:relative;">
+    <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#6b5d49;">
+      <span>No. 117 &middot; Summer Edition</span>
+      <span>Est. MMXXVI</span>
+    </div>
+    <div style="font-family:'Zilla Slab';font-weight:700;font-size:46px;line-height:.96;letter-spacing:.01em;margin:10px 0 4px;">The Weather Horizon Almanac</div>
+    <div style="font-style:italic;font-size:16px;color:#4a3d2c;">A field guide to escaping the rain &mdash; dry windows charted from Cincinnati, Ohio</div>
+    <div style="display:flex;align-items:center;gap:14px;justify-content:center;margin-top:12px;color:#6b5d49;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;">
+      <span style="flex:0 0 60px;height:1px;background:#2a2018;"></span>
+      <span>Forecast filed Sun, June 28</span>
+      <span style="flex:0 0 60px;height:1px;background:#2a2018;"></span>
+    </div>
+  </div>
+
+  <!-- BODY GRID -->
+  <div style="display:grid;grid-template-columns:248px 1fr;align-items:start;">
+
+    <!-- CONTROLS RAIL -->
+    <aside style="border-right:1.5px solid #2a2018;padding:20px 20px 26px;background:#efe3c4;">
+      <div style="font-family:'Zilla Slab';font-weight:700;font-size:13px;letter-spacing:.18em;text-transform:uppercase;border-bottom:1.5px solid #2a2018;padding-bottom:7px;margin-bottom:18px;">Set Your Preferences</div>
+
+      <div style="margin-bottom:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+          <span style="font-size:13.5px;font-weight:600;">Rain risk tolerance</span>
+          <span style="font-family:'DM Mono',monospace;font-weight:500;color:#9e3b22;">{{ rainTol }}%</span>
+        </div>
+        <input type="range" min="0" max="90" step="5" value="{{ rainTol }}" onInput="{{ onRain }}" style="width:100%;height:4px;" />
+        <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9.5px;color:#8a7a60;letter-spacing:.08em;margin-top:3px;"><span>BONE DRY</span><span>GAMBLER</span></div>
+      </div>
+
+      <div style="margin-bottom:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+          <span style="font-size:13.5px;font-weight:600;">Heat ceiling</span>
+          <span style="font-family:'DM Mono',monospace;font-weight:500;color:#9e3b22;">{{ maxTemp }}&deg;F</span>
+        </div>
+        <input type="range" min="78" max="100" step="1" value="{{ maxTemp }}" onInput="{{ onTemp }}" style="width:100%;height:4px;" />
+        <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9.5px;color:#8a7a60;letter-spacing:.08em;margin-top:3px;"><span>78&deg;</span><span>100&deg;</span></div>
+      </div>
+
+      <div style="margin-bottom:22px;">
+        <div style="font-size:13.5px;font-weight:600;margin-bottom:8px;">Forecast horizon</div>
+        <div style="display:flex;border:1.4px solid #2a2018;">
+          <sc-for list="{{ horizonOpts }}" as="opt" hint-placeholder-count="3">
+            <button onClick="{{ opt.set }}" style="{{ opt.style }}">{{ opt.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:13.5px;font-weight:600;margin-bottom:8px;">Departure day</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;">
+          <sc-for list="{{ departDays }}" as="d" hint-placeholder-count="7">
+            <button onClick="{{ d.set }}" style="{{ d.style }}"><span style="font-size:11px;font-weight:700;letter-spacing:.04em;">{{ d.dow }}</span><span style="font-family:'DM Mono',monospace;font-size:9.5px;opacity:.7;">{{ d.md }}</span></button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="margin-top:24px;padding-top:16px;border-top:1px dashed #00000040;font-style:italic;font-size:12.5px;line-height:1.5;color:#5a4c38;">
+        &ldquo;{{ proverb }}&rdquo;
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main style="padding:24px 28px 30px;min-width:0;">
+
+      <!-- VERDICT + COMPASS -->
+      <div style="display:grid;grid-template-columns:1fr 268px;gap:26px;align-items:start;margin-bottom:26px;">
+        <section style="min-width:0;">
+          <div style="font-family:'Zilla Slab';font-weight:700;font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#9e3b22;margin-bottom:3px;">This Week&rsquo;s Verdict</div>
+          <h2 style="font-family:'Zilla Slab';font-weight:700;font-size:25px;margin:0 0 16px;line-height:1.05;">{{ verdictLine }}</h2>
+          <div>{{ picks }}</div>
+        </section>
+        <aside style="border:1.4px solid #2a2018;background:#efe3c4;padding:14px 14px 10px;">
+          <div style="font-family:'Zilla Slab';font-weight:700;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;text-align:center;border-bottom:1px solid #2a2018;padding-bottom:7px;margin-bottom:8px;">Directional Dry Window</div>
+          <div>{{ radar }}</div>
+        </aside>
+      </div>
+
+      <!-- TRIP PLAN -->
+      <div>{{ tripPlan }}</div>
+
+      <!-- LEDGER TABLE -->
+      <div style="margin-top:28px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:1.5px solid #2a2018;padding-bottom:7px;margin-bottom:0;">
+          <div style="font-family:'Zilla Slab';font-weight:700;font-size:13px;letter-spacing:.18em;text-transform:uppercase;">The Full Register &mdash; {{ count }} Camps</div>
+          <div style="font-family:'DM Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:#6b5d49;">RANKED BY TRIP QUALITY &middot; CLICK A ROW TO PLAN</div>
+        </div>
+        <div class="alm-scroll" style="overflow-x:auto;">{{ table }}</div>
+      </div>
+
+      <div style="margin-top:22px;padding-top:14px;border-top:3px double #2a2018;display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6b5d49;">
+        <span>Origin &mdash; Cincinnati, OH</span>
+        <span>Sample data for layout</span>
+        <span>Travel Tools &middot; Almanac Series</span>
+      </div>
+    </main>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1220,&quot;height&quot;:900},&quot;accentInk&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#9e3b22&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Almanac&quot;,&quot;options&quot;:[&quot;#9e3b22&quot;,&quot;#2d4a6b&quot;,&quot;#2f5d3a&quot;,&quot;#6b3a52&quot;]},&quot;highlightWindow&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Almanac&quot;}}">
+class Component extends DCLogic {
+  state = { ready:false, rainTol:50, maxTemp:84, horizon:7, departIdx:0, focus:null };
+
+  async componentDidMount(){
+    try{ const m = await import('./forecast-data.js'); this.M = m; this.setState({ready:true}); }
+    catch(e){ console.error('data load failed', e); }
+  }
+
+  // palette
+  C = { paper:'#f4ecd6', panel:'#efe3c4', ink:'#2a2018', soft:'#6b5d49', rust:'#9e3b22', green:'#36603f', line:'rgba(42,32,24,.22)' };
+
+  set = (k,v)=>this.setState({[k]:v});
+
+  cols(){ const {departIdx,horizon}=this.state; const n=Math.min(horizon,14-departIdx);
+    return Array.from({length:n},(_,i)=>({i, ...this.M.dayMeta(departIdx+i)})); }
+
+  // ---- COMPASS RADAR ----
+  buildRadar(opts){
+    const h=React.createElement, cx=134,cy=128,R=92;
+    const data=this.M.radar(opts);
+    const ang=i=>(i*45)*Math.PI/180;
+    const pt=(i,r)=>[cx+r*Math.sin(ang(i)), cy-r*Math.cos(ang(i))];
+    const ring=(frac)=>data.map((_,i)=>pt(i,R*frac).join(',')).join(' ');
+    const poly=data.map((d,i)=>pt(i,R*(d.value/100)).join(',')).join(' ');
+    const labels=['N','NE','E','SE','S','SW','W','NW'];
+    const els=[];
+    [1,0.66,0.33].forEach((f,k)=>els.push(h('polygon',{key:'r'+k,points:ring(f),fill:'none',stroke:this.C.ink,strokeWidth:k===0?1.2:0.6,opacity:k===0?0.55:0.28})));
+    data.forEach((d,i)=>{const[x,y]=pt(i,R);els.push(h('line',{key:'s'+i,x1:cx,y1:cy,x2:x,y2:y,stroke:this.C.ink,strokeWidth:0.5,opacity:0.25}));});
+    els.push(h('polygon',{key:'fill',points:poly,fill:this.C.green,fillOpacity:0.16,stroke:this.C.green,strokeWidth:1.8,strokeLinejoin:'round'}));
+    data.forEach((d,i)=>{const[x,y]=pt(i,R*(d.value/100));els.push(h('circle',{key:'d'+i,cx:x,cy:y,r:2.4,fill:this.C.rust}));});
+    labels.forEach((L,i)=>{const[x,y]=pt(i,R+15);els.push(h('text',{key:'l'+i,x,y:y+3,textAnchor:'middle',fontFamily:'DM Mono,monospace',fontSize:9.5,fontWeight:600,fill:this.C.ink,letterSpacing:'.05em'},L));});
+    // best direction marker
+    const best=[...data].sort((a,b)=>b.value-a.value)[0];
+    return h('div',{style:{textAlign:'center'}},
+      h('svg',{viewBox:'0 0 268 270',style:{width:'100%',display:'block'}},els),
+      h('div',{style:{fontFamily:'DM Mono,monospace',fontSize:10.5,letterSpacing:'.1em',color:this.C.soft,marginTop:2}}, 'BEST BEARING \u2014 ',
+        h('span',{style:{color:this.C.green,fontWeight:600}}, this.M.DIR_LABEL[best.dir].toUpperCase()))
+    );
+  }
+
+  // ---- TOP PICKS ----
+  buildPicks(ranked){
+    const h=React.createElement, C=this.C; const top=ranked.slice(0,3);
+    const medal=['I','II','III'];
+    return h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px'}},
+      top.map((p,idx)=>h('button',{key:p.name,onClick:()=>this.set('focus',p.name),
+        style:{textAlign:'left',cursor:'pointer',background:idx===0?C.ink:C.panel,color:idx===0?C.paper:C.ink,
+          border:'1.4px solid '+C.ink,padding:'13px 14px 12px',font:'inherit',position:'relative',transition:'transform .12s'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}},
+          h('span',{style:{fontFamily:'DM Mono,monospace',fontSize:10,letterSpacing:'.14em',opacity:.7}}, idx===0?'TOP PICK':'NO. '+medal[idx]),
+          h('span',{style:{fontFamily:'DM Mono,monospace',fontSize:10,letterSpacing:'.08em',opacity:.7}}, p.dirLabel)),
+        h('div',{style:{fontFamily:'Zilla Slab',fontWeight:700,fontSize:idx===0?19:15.5,lineHeight:1.05,marginBottom:8}}, p.name),
+        h('div',{style:{display:'flex',alignItems:'flex-end',justifyContent:'space-between'}},
+          h('div',null,
+            h('span',{style:{fontFamily:'Zilla Slab',fontWeight:700,fontSize:idx===0?34:26,color:idx===0?'#e8b04a':C.green}}, p.score.toFixed(1)),
+            h('span',{style:{fontFamily:'DM Mono,monospace',fontSize:10,opacity:.6,marginLeft:3}}, '/100')),
+          h('div',{style:{textAlign:'right',fontFamily:'DM Mono,monospace',fontSize:10,lineHeight:1.5,opacity:.85}},
+            h('div',null, p.dryWindow+'d dry'),
+            h('div',null, p.drive.toFixed(1)+'h drive')))
+      ))
+    );
+  }
+
+  // ---- TRIP PLAN ----
+  buildPlan(ranked){
+    const h=React.createElement, C=this.C;
+    const f=this.state.focus; const p=(f && ranked.find(x=>x.name===f))||ranked[0];
+    const cols=this.cols();
+    const verdict = p.dryWindow>=5?'Pack the tent \u2014 a long dry window.':p.dryWindow>=3?'Workable. Watch the back half.':p.avgRain>50?'Soggy. Consider a rain plan.':'Mixed bag \u2014 plan loosely.';
+    return h('div',{style:{border:'1.4px solid '+C.ink,background:C.panel,padding:'15px 18px 16px',marginTop:4}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',borderBottom:'1px solid '+C.line,paddingBottom:9,marginBottom:11,flexWrap:'wrap',gap:6}},
+        h('div',null,
+          h('span',{style:{fontFamily:'DM Mono,monospace',fontSize:10,letterSpacing:'.16em',color:C.rust}}, 'TRIP PLAN \u2014 '),
+          h('span',{style:{fontFamily:'Zilla Slab',fontWeight:700,fontSize:20}}, p.name)),
+        h('div',{style:{fontFamily:'DM Mono,monospace',fontSize:11,color:C.soft}}, p.dirLabel+' \u00b7 '+Math.round(p.miles)+' mi \u00b7 ~'+p.drive.toFixed(1)+'h')),
+      h('div',{style:{display:'flex',gap:5,marginBottom:11,flexWrap:'wrap'}},
+        cols.map((c,i)=>{const d=p.window[i]; if(!d)return null; const dry=d.rain<=this.state.rainTol;
+          const inWin = this.hl && i>=p.bestStart && i<p.bestStart+p.dryWindow;
+          return h('div',{key:i,style:{flex:'1 1 0',minWidth:54,textAlign:'center',padding:'7px 4px 6px',
+            border:'1px solid '+(inWin?C.green:C.line),background:inWin?'rgba(54,96,63,.10)':'transparent'}},
+            h('div',{style:{fontFamily:'DM Mono,monospace',fontSize:9,letterSpacing:'.05em',color:C.soft}}, c.dow+' '+c.md),
+            h('div',{style:{fontFamily:'Zilla Slab',fontWeight:700,fontSize:16,color:d.temp>this.state.maxTemp?C.rust:C.ink}}, d.temp+'\u00b0'),
+            h('div',{style:{fontFamily:'DM Mono,monospace',fontSize:10,fontWeight:500,color:dry?C.green:C.rust}}, d.rain+'%'),
+            h('div',{style:{fontFamily:'DM Mono,monospace',fontSize:8,letterSpacing:'.08em',color:C.soft,marginTop:1}}, d.code));
+        })),
+      h('div',{style:{display:'flex',alignItems:'baseline',gap:14,flexWrap:'wrap'}},
+        h('div',{style:{fontStyle:'italic',fontSize:14.5,color:C.ink}}, verdict),
+        h('div',{style:{fontFamily:'DM Mono,monospace',fontSize:11,color:C.soft}},
+          'Best window: '+(p.window[p.bestStart]?cols[p.bestStart].dow+' '+cols[p.bestStart].md:'\u2014')+' \u00b7 '+p.dryWindow+' dry days \u00b7 avg rain '+p.avgRain+'%'))
+    );
+  }
+
+  // ---- LEDGER TABLE ----
+  buildTable(ranked){
+    const h=React.createElement, C=this.C; const cols=this.cols(); const rt=this.state.rainTol, mt=this.state.maxTemp;
+    const th=(txt,extra)=>h('th',{style:Object.assign({fontFamily:'DM Mono,monospace',fontSize:9.5,fontWeight:500,letterSpacing:'.1em',color:C.soft,textTransform:'uppercase',padding:'8px 6px',textAlign:'left',whiteSpace:'nowrap',borderBottom:'1.5px solid '+C.ink},extra||{})},txt);
+    const head=h('tr',null,
+      h('th',{style:{width:26,borderBottom:'1.5px solid '+C.ink}}),
+      th('Destination'), th('Bearing'),
+      cols.map(c=>h('th',{key:c.i,style:{borderBottom:'1.5px solid '+C.ink,padding:'6px 4px 7px',textAlign:'center',width:62}},
+        h('div',{style:{fontFamily:'DM Mono,monospace',fontSize:10,fontWeight:600,letterSpacing:'.06em',color:C.ink,textTransform:'uppercase'}},c.dow),
+        h('div',{style:{fontFamily:'DM Mono,monospace',fontSize:8.5,color:C.soft}},c.md))),
+      th('Dry',{textAlign:'center'}), th('Score',{textAlign:'right'}));
+    const rows=ranked.map((p,ri)=>{
+      const sel=this.state.focus===p.name;
+      return h('tr',{key:p.name,onClick:()=>this.set('focus',p.name),
+        style:{cursor:'pointer',background:sel?'rgba(54,96,63,.13)':(ri%2?'rgba(0,0,0,.022)':'transparent'),
+          boxShadow:sel?'inset 3px 0 0 '+C.green:'none'}},
+        h('td',{style:{fontFamily:'DM Mono,monospace',fontSize:10,color:C.soft,textAlign:'right',padding:'0 4px'}}, ri+1),
+        h('td',{style:{padding:'7px 6px',borderBottom:'1px solid '+C.line,whiteSpace:'nowrap'}},
+          h('span',{style:{fontWeight:600,fontSize:14}}, p.name)),
+        h('td',{style:{padding:'7px 6px',borderBottom:'1px solid '+C.line,fontFamily:'DM Mono,monospace',fontSize:10.5,color:C.soft,whiteSpace:'nowrap'}}, p.dirLabel),
+        cols.map((c,i)=>{const d=p.window[i]; const dry=d&&d.rain<=rt; const inWin=this.hl&&d&&i>=p.bestStart&&i<p.bestStart+p.dryWindow;
+          return h('td',{key:i,style:{padding:'4px 4px',borderBottom:'1px solid '+C.line,textAlign:'center',
+            background:!d?'transparent':dry?'rgba(54,96,63,.09)':'rgba(158,59,34,.07)',
+            boxShadow:inWin?'inset 0 -2px 0 '+C.green:'none'}},
+            d?[h('div',{key:'t',style:{fontFamily:'DM Mono,monospace',fontSize:11.5,fontWeight:500,color:d.temp>mt?C.rust:C.ink}}, d.temp+'\u00b0'),
+               h('div',{key:'r',style:{fontFamily:'DM Mono,monospace',fontSize:10,color:dry?C.green:C.rust}}, d.rain+'%')]:'\u00b7');
+        }),
+        h('td',{style:{padding:'7px 6px',borderBottom:'1px solid '+C.line,textAlign:'center'}},
+          h('span',{style:{fontFamily:'DM Mono,monospace',fontSize:11,fontWeight:600,color:p.dryWindow>=5?C.green:p.dryWindow>=3?C.ink:C.rust}}, p.dryWindow+'d')),
+        h('td',{style:{padding:'7px 8px 7px 6px',borderBottom:'1px solid '+C.line,textAlign:'right'}},
+          h('span',{style:{fontFamily:'Zilla Slab',fontWeight:700,fontSize:16,color:p.score>=85?C.green:p.score>=72?C.ink:C.rust}}, p.score.toFixed(1))));
+    });
+    return h('table',{style:{borderCollapse:'collapse',width:'100%',minWidth:Math.max(640,360+cols.length*62)}},
+      h('thead',null,head), h('tbody',null,rows));
+  }
+
+  renderVals(){
+    this.C = { ...this.C, rust: this.props.accentInk || this.C.rust };
+    this.hl = this.props.highlightWindow !== false;
+    const C=this.C;
+    const horizonOpts=[5,7,10].map(v=>({label:v+'-Day',set:()=>this.set('horizon',v),
+      style:`flex:1;padding:7px 0;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;border:none;border-right:${v===10?'none':'1.4px solid '+C.ink};background:${this.state.horizon===v?C.ink:'transparent'};color:${this.state.horizon===v?C.paper:C.ink};`}));
+    const baseStyle=(active)=>`display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;font:inherit;cursor:pointer;border:1.3px solid ${C.ink};background:${active?C.ink:'transparent'};color:${active?C.paper:C.ink};`;
+    if(!this.M){
+      const ph=Array.from({length:7},(_,i)=>({dow:'',md:'',set:()=>{},style:baseStyle(false)}));
+      return { ready:false, rainTol:this.state.rainTol, maxTemp:this.state.maxTemp,
+        onRain:e=>this.set('rainTol',+e.target.value), onTemp:e=>this.set('maxTemp',+e.target.value),
+        horizonOpts, departDays:ph, proverb:'Red sky at night, camper\u2019s delight.',
+        verdictLine:'Charting the dry windows\u2026', picks:'', radar:'', tripPlan:'', table:'', count:'\u2014' };
+    }
+    const opts={rainTol:this.state.rainTol,maxTemp:this.state.maxTemp,horizon:this.state.horizon,departIdx:this.state.departIdx};
+    const ranked=this.M.rank(opts);
+    const departDays=Array.from({length:7},(_,i)=>{const m=this.M.dayMeta(i);
+      return {dow:m.dow,md:m.md,set:()=>this.set('departIdx',i),style:baseStyle(this.state.departIdx===i)};});
+    const top=ranked[0];
+    const verdictLine = top.dirLabel+' is your driest escape \u2014 '+top.name+' leads with '+top.dryWindow+' clear days.';
+    const proverbs=['Red sky at night, camper\u2019s delight.','When the dew is on the grass, rain will never come to pass.','A ring around the moon means rain is coming soon.'];
+    return {
+      ready:true, rainTol:this.state.rainTol, maxTemp:this.state.maxTemp,
+      onRain:e=>this.set('rainTol',+e.target.value), onTemp:e=>this.set('maxTemp',+e.target.value),
+      horizonOpts, departDays, proverb:proverbs[this.state.departIdx%3],
+      verdictLine, count:ranked.length,
+      picks:this.buildPicks(ranked), radar:this.buildRadar(opts),
+      tripPlan:this.buildPlan(ranked), table:this.buildTable(ranked),
+    };
+  }
+}
+</script>
+</body>
+</html>

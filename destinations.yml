@@ -1,0 +1,257 @@
+destinations:
+
+  # ── Ohio ──────────────────────────────────────────────────────────────────
+
+  - name: Caesar Creek SP
+    direction: East
+    lat: 39.4897
+    lon: -84.0514
+
+  - name: East Fork SP
+    direction: Southeast
+    lat: 38.8331
+    lon: -84.1003
+
+  - name: Rocky Fork SP
+    direction: East
+    lat: 39.1833
+    lon: -83.8500
+
+  - name: Paint Creek SP
+    direction: East
+    lat: 39.2167
+    lon: -83.4500
+
+  - name: Pike Lake SP
+    direction: East
+    lat: 39.0833
+    lon: -83.2000
+
+  - name: Scioto Trail SP
+    direction: East
+    lat: 39.0667
+    lon: -83.0333
+
+  - name: Tar Hollow SP
+    direction: East
+    lat: 39.3833
+    lon: -82.7167
+
+  - name: Hocking Hills SP
+    direction: East
+    lat: 39.4337
+    lon: -82.5271
+
+  - name: Lake Hope SP
+    direction: East
+    lat: 39.3333
+    lon: -82.3500
+
+  - name: Zaleski Backcamp Trailhead
+    direction: East
+    lat: 39.2847
+    lon: -82.3852
+
+  - name: Burr Oak SP
+    direction: Northeast
+    lat: 39.5167
+    lon: -81.8833
+
+  - name: Salt Fork SP
+    direction: Northeast
+    lat: 40.1167
+    lon: -81.5833
+
+  - name: Wayne NF
+    direction: North
+    lat: 39.4800
+    lon: -82.1500
+
+  - name: John Bryan SP
+    direction: North
+    lat: 39.7833
+    lon: -83.8833
+
+  - name: Buck Creek SP
+    direction: North
+    lat: 39.9333
+    lon: -83.6500
+
+  - name: Mohican SP
+    direction: North
+    lat: 40.6167
+    lon: -82.3167
+
+  - name: Hueston Woods SP
+    direction: Northwest
+    lat: 39.5667
+    lon: -84.7333
+
+  - name: Maumee Bay SP
+    direction: North
+    lat: 41.6833
+    lon: -83.3833
+
+  - name: Shawnee SP (OH)
+    direction: Southeast
+    lat: 38.6833
+    lon: -83.2167
+
+  # ── Kentucky ──────────────────────────────────────────────────────────────
+
+  - name: Blue Licks SP
+    direction: Southeast
+    lat: 38.4500
+    lon: -84.0167
+
+  - name: General Butler SP
+    direction: South
+    lat: 38.6833
+    lon: -84.8667
+
+  - name: Carter Caves SP
+    direction: Southeast
+    lat: 38.3667
+    lon: -83.1167
+
+  - name: Cave Run Lake
+    direction: Southeast
+    lat: 38.1000
+    lon: -83.4833
+
+  - name: Grayson Lake SP
+    direction: Southeast
+    lat: 38.3333
+    lon: -82.9333
+
+  - name: Jenny Wiley SP
+    direction: Southeast
+    lat: 37.7000
+    lon: -82.8333
+
+  - name: Breaks Interstate Park
+    direction: Southeast
+    lat: 37.2833
+    lon: -82.3000
+
+  - name: Red River Gorge (Koomer)
+    direction: Southeast
+    lat: 37.7844
+    lon: -83.6331
+
+  - name: Natural Bridge SP
+    direction: Southeast
+    lat: 37.7833
+    lon: -83.6833
+
+  - name: Daniel Boone NF
+    direction: South
+    lat: 37.4604
+    lon: -83.9321
+
+  - name: Buckhorn Lake SP
+    direction: South
+    lat: 37.3500
+    lon: -83.4833
+
+  - name: Shawnee Forest Primitive
+    direction: South
+    lat: 38.7188
+    lon: -83.1931
+
+  - name: Cumberland Falls SP
+    direction: South
+    lat: 36.8333
+    lon: -84.3500
+
+  - name: Lake Cumberland SP
+    direction: South
+    lat: 36.8970
+    lon: -85.1538
+
+  - name: Green River Lake SP
+    direction: South
+    lat: 37.2667
+    lon: -85.3333
+
+  - name: Mammoth Cave NP
+    direction: Southwest
+    lat: 37.1833
+    lon: -86.1000
+
+  - name: Barren River Lake SP
+    direction: Southwest
+    lat: 36.8833
+    lon: -86.1500
+
+  # ── Indiana ───────────────────────────────────────────────────────────────
+
+  - name: Hardy Lake
+    direction: West
+    lat: 38.9833
+    lon: -85.5167
+
+  - name: Versailles SP
+    direction: West
+    lat: 39.0667
+    lon: -85.2500
+
+  - name: Clifty Falls Canyon
+    direction: West
+    lat: 38.7495
+    lon: -85.4211
+
+  - name: Spring Mill SP
+    direction: West
+    lat: 38.7167
+    lon: -86.4167
+
+  - name: Monroe Lake
+    direction: West
+    lat: 39.0167
+    lon: -86.5167
+
+  - name: Brown County SP
+    direction: West
+    lat: 39.2000
+    lon: -86.2333
+
+  - name: Hoosier NF
+    direction: West
+    lat: 38.5362
+    lon: -86.4685
+
+  - name: Deam Wilderness Tower
+    direction: West
+    lat: 39.0348
+    lon: -86.3986
+
+  - name: McCormick's Creek SP
+    direction: West
+    lat: 39.2833
+    lon: -86.7167
+
+  - name: Patoka Lake
+    direction: West
+    lat: 38.4167
+    lon: -86.6833
+
+  - name: O'Bannon Woods SP
+    direction: Southwest
+    lat: 38.1333
+    lon: -86.2333
+
+  - name: Lincoln SP
+    direction: Southwest
+    lat: 37.9500
+    lon: -87.1167
+
+  - name: Shades SP
+    direction: Northwest
+    lat: 39.9167
+    lon: -87.0833
+
+  - name: Turkey Run SP
+    direction: Northwest
+    lat: 39.8833
+    lon: -87.2167

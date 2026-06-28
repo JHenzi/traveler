@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>National Camp Forecast Bureau</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="bur-body">
+<div class="bur-wrap">
+<div class="bur-sheet">
+
+  <!-- HEADER BAR -->
+  <div class="bur-header">
+    <div class="bur-header-logo">WX</div>
+    <div class="bur-header-title">
+      <div class="bur-header-name">National Camp Forecast Bureau</div>
+      <div class="bur-header-sub">DRY-WINDOW DISPATCH &nbsp;/&nbsp; ESCAPE-THE-RAIN ROUTING &nbsp;/&nbsp; STATION: CINCINNATI OH (KCVG)</div>
+    </div>
+    <div class="bur-header-meta">
+      <div class="bur-bulletin-label">BULLETIN No.</div>
+      <div class="bur-bulletin-no">{{ bulletin_no }}</div>
+      <div class="bur-filed-stamp">FILED {{ today }}</div>
+    </div>
+  </div>
+
+  <!-- TICKER -->
+  <div class="bur-ticker">
+    <span class="bur-ticker-advisory">&#9632; ADVISORY</span>
+    <span id="ticker-text">ESTABLISHING UPLINK…</span>
+  </div>
+
+  <div class="bur-body-grid">
+
+    <!-- SIDEBAR -->
+    <aside class="bur-sidebar">
+      <div class="bur-sidebar-hdr">Routing Parameters</div>
+
+      <div class="bur-ctl">
+        <div class="bur-ctl-hdr">
+          <span class="bur-ctl-num">01 / RAIN RISK TOLERANCE</span>
+          <span class="bur-ctl-val" id="threshold-val">{{ threshold }}%</span>
+        </div>
+        <input type="range" id="threshold" min="0" max="90" step="5" value="{{ threshold }}" />
+        <div class="bur-ctl-ends"><span>0 / DRY</span><span>90 / WET OK</span></div>
+      </div>
+
+      <div class="bur-ctl">
+        <div class="bur-ctl-hdr">
+          <span class="bur-ctl-num">02 / HEAT CEILING</span>
+          <span class="bur-ctl-val" id="temp-threshold-val">{{ temp_threshold }}°F</span>
+        </div>
+        <input type="range" id="temp-threshold" min="78" max="100" step="1" value="{{ temp_threshold }}" />
+        <div class="bur-ctl-ends"><span>78°</span><span>100°</span></div>
+      </div>
+
+      <div class="bur-ctl bur-ctl--padded">
+        <div class="bur-ctl-num bur-ctl-num--solo">03 / FORECAST HORIZON</div>
+        <div class="bur-horizon-btns">
+          <button class="bur-horizon-btn{% if horizon == 5 %} active{% endif %}" data-val="5">5-DAY</button>
+          <button class="bur-horizon-btn{% if horizon == 7 %} active{% endif %}" data-val="7">7-DAY</button>
+          <button class="bur-horizon-btn{% if horizon == 10 %} active{% endif %}" data-val="10">10-DAY</button>
+        </div>
+      </div>
+
+      <div class="bur-ctl bur-ctl--padded">
+        <div class="bur-ctl-num bur-ctl-num--solo">04 / DEPARTURE DAY</div>
+        <div class="bur-depart-grid" id="depart-btns">
+          <!-- rendered by JS after forecast load -->
+          {% for i in range(1, 8) %}
+          <button class="bur-depart-btn{% if departure_day == i %} active{% endif %}" data-day="{{ i }}">
+            <span class="bur-depart-dow">D{{ i }}</span>
+            <span class="bur-depart-md">&nbsp;</span>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="bur-sidebar-status">
+        <div class="bur-status-text">
+          TRANSMISSION OK. <span id="station-count">{{ rows | length }}</span> STATIONS REPORTING. RANK = TRIP QUALITY INDEX, 0&ndash;100.
+        </div>
+        <div class="bur-refresh-row">
+          <button class="bur-refresh-btn" id="refresh-btn">&#8635; REFRESH</button>
+          <span class="bur-last-updated" id="last-updated">{{ last_updated }}</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="bur-main">
+
+      <!-- PRIORITY DISPATCH + DIRECTIONAL SCOPE -->
+      <div class="bur-top-row">
+        <section class="bur-dispatch">
+          <div class="bur-section-label">Priority Dispatch</div>
+          <h2 class="bur-verdict" id="verdict-line">Compiling dispatch…</h2>
+          <div id="picks-container">{% include 'top3.html' %}</div>
+        </section>
+        <aside class="bur-radar-panel">
+          <div class="bur-radar-label">Directional Scope</div>
+          <div id="radar-container"></div>
+        </aside>
+      </div>
+
+      <!-- TRIP PLAN -->
+      <div id="trip-plan-wrap"></div>
+
+      <!-- DATA SHEET -->
+      <div class="bur-datasheet">
+        <div class="bur-datasheet-hdr">
+          <div class="bur-section-label bur-section-label--ink">Station Data Sheet</div>
+          <div class="bur-datasheet-hint">SELECT ROW TO ROUTE &#9656;</div>
+        </div>
+        <div class="bur-scroll bur-table-wrap" id="grid-container">
+          {% include 'grid.html' %}
+        </div>
+        <div class="bur-datasheet-footer">
+          <span>End of transmission</span>
+          <span id="last-updated-footer">{{ last_updated }}</span>
+          <span>Travel Tools &middot; Bureau Series</span>
+        </div>
+      </div>
+
+    </main>
+  </div><!-- /bur-body-grid -->
+
+</div><!-- /bur-sheet -->
+</div><!-- /bur-wrap -->
+<script src="/static/app.js"></script>
+</body>
+</html>

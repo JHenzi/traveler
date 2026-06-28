@@ -1,0 +1,6 @@
+services:
+  web:
+    build: .
+    ports:
+      - "5847:5000"
+    restart: unless-stopped
