@@ -3,4 +3,22 @@ services:
     build: .
     ports:
       - "5847:5000"
+    volumes:
+      - db_data:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/traveler.db
     restart: unless-stopped
+    depends_on:
+      - scheduler
+
+  scheduler:
+    build: .
+    command: python -m app.jobs
+    volumes:
+      - db_data:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/traveler.db
+    restart: unless-stopped
+
+volumes:
+  db_data:

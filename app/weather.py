@@ -1,31 +1,15 @@
-import time
 import requests
+from . import db
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
-CACHE_TTL = 30 * 60  # 30 minutes
-
-_cache = {}  # key: horizon -> {fetched_at, data}
-
-
-def _cache_get(horizon):
-    entry = _cache.get(horizon)
-    if entry and (time.time() - entry["fetched_at"]) < CACHE_TTL:
-        return entry["data"]
-    return None
-
-
-def _cache_set(horizon, data):
-    _cache[horizon] = {"fetched_at": time.time(), "data": data}
 
 
 def cache_last_updated():
-    if not _cache:
-        return None
-    return max(e["fetched_at"] for e in _cache.values())
+    return db.cache_last_updated()
 
 
 def cache_invalidate():
-    _cache.clear()
+    db.cache_invalidate()
 
 WMO_CODES = {
     0: ("Clear sky", "☀️"),
@@ -71,7 +55,7 @@ def wmo_to_label(code):
 
 def fetch_forecasts(destinations, horizon=7, force=False):
     if not force:
-        cached = _cache_get(horizon)
+        cached = db.cache_get(horizon)
         if cached is not None:
             return cached
 
@@ -109,7 +93,7 @@ def fetch_forecasts(destinations, horizon=7, force=False):
             })
         results[dest["name"]] = days
 
-    _cache_set(horizon, results)
+    db.cache_set(horizon, results)
     return results
 
 
