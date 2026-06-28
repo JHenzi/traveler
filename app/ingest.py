@@ -137,7 +137,11 @@ def _fetch_overpass_region(south, north, west, east):
     );
     out center;
     '''
-    resp = requests.post(OVERPASS_URL, data={'data': query}, timeout=90)
+    headers = {
+        'User-Agent': 'NationalCampForecastBureau/1.0 (travel.henzi.org)',
+        'Accept': 'application/json',
+    }
+    resp = requests.post(OVERPASS_URL, data={'data': query}, headers=headers, timeout=90)
     resp.raise_for_status()
     elements = resp.json().get('elements', [])
 

@@ -16,9 +16,9 @@ services:
     command: python -m app.jobs
     volumes:
       - db_data:/app/data
+    env_file: .env
     environment:
       - DATABASE_PATH=/app/data/traveler.db
-      - RIDB_API_KEY=${RIDB_API_KEY:-}
     restart: unless-stopped
 
 volumes:

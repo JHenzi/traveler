@@ -1,0 +1,25 @@
+# secrets
+.env
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# data
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# docker
+.dockerenv
+
+# editor
+.DS_Store
+.vscode/
+*.swp
