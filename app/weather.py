@@ -1,7 +1,10 @@
+import logging
 import requests
 from . import db
 
+log = logging.getLogger(__name__)
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+BATCH_SIZE = 300  # Open-Meteo practical limit per request
 
 
 def cache_last_updated():
@@ -10,6 +13,60 @@ def cache_last_updated():
 
 def cache_invalidate():
     db.cache_invalidate()
+
+
+def refresh_campground_forecasts(horizon=10):
+    """
+    Fetch weather for every campground in the DB and write to the forecasts table.
+    Called by the scheduler every 6 hours. Batches 300 campgrounds per Open-Meteo request.
+    """
+    campgrounds = db.get_all_campgrounds()
+    if not campgrounds:
+        log.warning('No campgrounds in DB — skipping forecast refresh')
+        return
+
+    total = 0
+    for i in range(0, len(campgrounds), BATCH_SIZE):
+        batch = campgrounds[i:i + BATCH_SIZE]
+        try:
+            _fetch_and_store_batch(batch, horizon)
+            total += len(batch)
+        except Exception as exc:
+            log.error('Batch %d-%d failed: %s', i, i + len(batch), exc)
+
+    log.info('Forecast refresh complete — %d campgrounds updated', total)
+
+
+def _fetch_and_store_batch(campgrounds, horizon):
+    lats = ','.join(str(c['lat']) for c in campgrounds)
+    lons = ','.join(str(c['lon']) for c in campgrounds)
+    params = {
+        'latitude':      lats,
+        'longitude':     lons,
+        'daily':         'temperature_2m_max,precipitation_probability_max,weathercode',
+        'forecast_days': horizon,
+        'timezone':      'America/New_York',
+        'temperature_unit': 'fahrenheit',
+    }
+    resp = requests.get(OPEN_METEO_URL, params=params, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    if isinstance(data, dict):
+        data = [data]
+
+    for camp, forecast in zip(campgrounds, data):
+        daily = forecast.get('daily', {})
+        times = daily.get('time', [])
+        days = [
+            {
+                'date':        times[j],
+                'temp_max':    daily['temperature_2m_max'][j],
+                'precip_prob': daily['precipitation_probability_max'][j],
+                'weathercode': daily['weathercode'][j],
+            }
+            for j in range(len(times))
+        ]
+        db.upsert_forecasts(camp['id'], days)
 
 WMO_CODES = {
     0: ("Clear sky", "☀️"),
@@ -135,6 +192,38 @@ def calc_trip_score(days, departure_idx, threshold, temp_threshold=82):
 
     score = max(0, round(100 - rain_penalty - heat_penalty, 1))
     return score, False
+
+
+def build_grid_from_db(campgrounds, db_forecasts, threshold=30):
+    """
+    Build the same row format as build_grid() but from pre-loaded DB data.
+    campgrounds: list of {id, name, direction, lat, lon, distance_mi, ...}
+    db_forecasts: {campground_id: [day_dicts]} from db.get_forecasts_for_camps()
+    """
+    rows = []
+    for camp in campgrounds:
+        raw_days = db_forecasts.get(camp['id'], [])
+        days = [
+            {
+                'date':        d['date'],
+                'temp_max':    d['temp_max'],
+                'precip_prob': d['precip_prob'],
+                'emoji':       wmo_to_emoji(d.get('weathercode', 0)),
+                'label':       wmo_to_label(d.get('weathercode', 0)),
+            }
+            for d in raw_days
+        ]
+        precip_probs = [d['precip_prob'] for d in days]
+        dry_window = calc_dry_window(precip_probs, threshold)
+        rows.append({
+            'name':        camp['name'],
+            'direction':   camp.get('direction', ''),
+            'distance_mi': camp.get('distance_mi'),
+            'dry_window':  dry_window,
+            'days':        days,
+        })
+    rows.sort(key=lambda r: r['dry_window'], reverse=True)
+    return rows
 
 
 def build_grid(destinations, horizon=7, threshold=30, force=False):

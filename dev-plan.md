@@ -1,209 +1,294 @@
-# Dev Plan: Weather Horizon Route Planner
+# Dev Plan — Weather Horizon / National Camp Forecast Bureau
 
-## Stack
-
-- **Runtime:** Python 3.11
-- **Framework:** Flask
-- **Server:** Gunicorn
-- **Container:** Docker + docker-compose
-- **Database:** SQLite (WAL mode) — persistent, file-based, survives restarts
-- **Background jobs:** `APScheduler` (in-process scheduler, no Celery/Redis needed for this scale)
-- **Core libs:** `requests`, `pyyaml`, `apscheduler`
-- **Data sources:**
-  - Open-Meteo API (weather forecasts, no key required)
-  - RIDB Recreation.gov API (federal campgrounds, free key)
-  - Overpass API (OSM campgrounds, no key)
-  - Nominatim (geocoding, no key)
+**Last updated:** 2026-06-28  
+**Live at:** `192.168.1.220:5847` (local VPS, not yet public)  
+**Target domain:** `travel.henzi.org`
 
 ---
 
-## Project Structure
+## What's Already Done
 
-```
-traveler/
-├── app/
-│   ├── __init__.py          # Flask app factory — starts scheduler on first worker
-│   ├── routes.py            # GET /plan, GET /api/forecast
-│   ├── weather.py           # Open-Meteo batch fetch + dry-window algorithm
-│   ├── destinations.py      # Loads destinations.yml (used in v1, fallback in v2)
-│   ├── db.py                # SQLite connection, schema init, campground/forecast queries
-│   ├── ingest.py            # RIDB + Overpass fetch → insert into campgrounds table
-│   ├── jobs.py              # Background scheduler: refresh_all_forecasts() every 6h
-│   └── templates/
-│       ├── index.html
-│       ├── top3.html
-│       └── grid.html
-├── static/
-│   ├── style.css
-│   └── app.js
-├── destinations.yml          # Curated Cincinnati campgrounds (source='curated' in DB)
-├── data/                     # Docker volume mount point
-│   └── traveler.db           # SQLite database (gitignored)
-├── requirements.txt
-├── Dockerfile
-└── docker-compose.yml
-```
+| Feature | Status |
+|---|---|
+| Core Flask app — dry-window algorithm, trip score, Top 3 | ✅ |
+| Bureau Bulletin design system (Oswald + Space Mono, full UI) | ✅ |
+| Location input — Nominatim geocoding, bearing recompute | ✅ |
+| Heat ceiling visual — amber cells, HEAT badge in picks | ✅ |
+| Park Forecast click-to-focus panel | ✅ |
+| Dry window bug fixed — counts from departure day, not day 0 | ✅ |
+| SQLite shared cache — replaces per-worker in-memory dict | ✅ |
+| Scheduler container — only service that calls Open-Meteo | ✅ |
+| Docker Compose: `web` + `scheduler` + shared `db_data` volume | ✅ |
 
 ---
 
-## Database Schema (`db.py`)
+## Sprint 1 — Deploy to travel.henzi.org
+**Effort:** 1 afternoon  
+**Goal:** Public URL. Anyone can use it today.
+
+The app is ready. This is pure infrastructure.
+
+### Steps
+
+**1. DNS**
+In your registrar for henzi.org, add:
+```
+travel    A    YOUR_VPS_IP
+```
+TTL: 300 (5 min). Confirm with `dig travel.henzi.org` once propagated.
+
+**2. Nginx**
+The config is already written at `deploy/travel.henzi.org.conf`.
+On the VPS:
+```bash
+sudo cp deploy/travel.henzi.org.conf /etc/nginx/sites-available/travel.henzi.org
+sudo ln -s /etc/nginx/sites-available/travel.henzi.org /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**3. SSL**
+```bash
+sudo certbot --nginx -d travel.henzi.org
+```
+Auto-renews via the certbot systemd timer already on your VPS.
+
+**4. Deploy**
+On the VPS, in the project directory:
+```bash
+git pull
+docker compose up --build -d
+```
+The scheduler container runs the initial Open-Meteo fetch (~8 sec), then web workers serve from SQLite.
+
+**5. Smoke test**
+- `https://travel.henzi.org` loads
+- Location input geocodes a zip code
+- Sliders update the grid without page reload
+- `/api/forecast` returns JSON
+- `docker logs traveler-scheduler-1` shows "Sleeping 6h"
+
+**Deliverable:** Public URL you can share.
+
+---
+
+## Sprint 2 — Radius + Real Park Discovery (v2)
+**Effort:** 2–3 weekends  
+**Goal:** Works for any US user, not just Midwest campers. Campground list grows from 50 to thousands.
+
+This is the biggest architectural lift. The current `destinations.yml` is replaced by a live-queried campground database. The location input already geocodes — now it needs to query parks near that point instead of just recomputing direction on a fixed list.
+
+### 2A — Expand the SQLite Schema
+
+Add a `campgrounds` table alongside the existing `forecast_cache`:
 
 ```sql
--- Run once at startup if tables don't exist
 CREATE TABLE IF NOT EXISTS campgrounds (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
     lat         REAL NOT NULL,
     lon         REAL NOT NULL,
-    source      TEXT,        -- 'ridb', 'overpass', 'curated'
+    source      TEXT,    -- 'curated', 'ridb', 'overpass'
     state       TEXT,
     url         TEXT,
-    created_at  TEXT DEFAULT (datetime('now'))
+    UNIQUE(name, lat, lon)
 );
 
 CREATE TABLE IF NOT EXISTS forecasts (
     campground_id  INTEGER REFERENCES campgrounds(id) ON DELETE CASCADE,
-    date           TEXT,        -- YYYY-MM-DD
+    forecast_date  TEXT,
     temp_max       REAL,
     precip_prob    INTEGER,
     weathercode    INTEGER,
-    refreshed_at   TEXT DEFAULT (datetime('now')),
-    PRIMARY KEY (campground_id, date)
+    refreshed_at   REAL,
+    PRIMARY KEY (campground_id, forecast_date)
 );
 
 CREATE INDEX IF NOT EXISTS idx_campgrounds_latlon ON campgrounds(lat, lon);
-PRAGMA journal_mode=WAL;  -- concurrent read-safe, required for multi-worker Gunicorn
 ```
 
----
+**Important:** Keep `forecast_cache` as-is for now (the curated 50-camp fast path). Add the new tables alongside it. Migrate fully once ingestion is working.
 
-## Phase 1 — Database Layer (`db.py`)
+### 2B — Campground Ingestion (`app/ingest.py`)
 
-Key functions:
+Three sources, in priority order:
 
+**1. Curated YAML** (seed on startup, always present)
 ```python
-def init_db()                                   # create tables + WAL mode
-def get_campgrounds_near(lat, lon, radius_mi)   # returns list of {id,name,lat,lon,...}
-def get_forecasts(campground_ids)               # returns {id: [day_dicts]}
-def upsert_campgrounds(records)                 # insert or ignore by (name, lat, lon)
-def upsert_forecasts(campground_id, days)       # INSERT OR REPLACE
-def campground_count()                          # for health check endpoint
-def forecast_last_refreshed()                   # for UI "data as of" display
+def ingest_curated(db_conn):
+    destinations = load_destinations()  # existing YAML loader
+    for d in destinations:
+        db_conn.execute('INSERT OR IGNORE INTO campgrounds (name,lat,lon,source) VALUES (?,?,?,?)',
+                        (d['name'], d['lat'], d['lon'], 'curated'))
 ```
 
-Radius filtering uses the Haversine approximation in Python after a bounding-box pre-filter in SQL (fast index scan), then exact distance check in Python. No PostGIS needed.
+**2. RIDB — Recreation.gov** (federal lands, authoritative)
+- Free API key: sign up at recreation.gov/webform/get-api-access
+- Query: `GET /api/v1/facilities?activity=CAMPING&latitude=X&longitude=Y&radius=500&apikey=KEY`
+- Returns: name, lat, lon, facility type, reservation link
+- Run once daily via scheduler. Query by state bounding box to cover all of US.
+- ~3,500 facilities total.
 
----
+**3. Overpass API** (OSM — state parks, private sites, everything else)
+- No key required.
+- Query by US region bounding boxes to avoid timeout (split into ~20 regional chunks).
+- Filter: `tourism=camp_site` with a name tag (skip unnamed nodes — low quality).
+- ~20,000–50,000 nodes.
+- Deduplicate: if within 0.15 miles of a curated or RIDB entry, skip.
 
-## Phase 2 — Campground Ingestion (`ingest.py`)
+Add `RIDB_API_KEY` env var to `docker-compose.yml`. If absent, skip RIDB ingestion and use curated + Overpass only. The app still works without it.
 
-Runs once on first startup (if campgrounds table is empty), then nightly.
+### 2C — Scheduler: Weather Refresh for All Campgrounds
 
-```python
-def ingest_curated()     # load destinations.yml → upsert with source='curated'
-def ingest_ridb(lat, lon, radius_mi)   # RIDB API → upsert with source='ridb'
-def ingest_overpass(lat, lon, radius_mi)  # Overpass API → upsert with source='overpass'
-def dedup_campgrounds()  # remove overpass/ridb duplicates within 0.1mi of a curated entry
-```
-
-For v1, only `ingest_curated()` runs (populates from YAML). For v2, all three run.
-
----
-
-## Phase 3 — Weather Pipeline (`weather.py`)
-
-Mostly unchanged from v0. Key difference: `fetch_forecasts()` now accepts a list of campground dicts and returns results the same way — the caller (jobs.py) handles writing to DB.
-
-`build_grid()` and `build_top3()` are unchanged — they take the same input format whether it came from a live API call or a DB read.
-
----
-
-## Phase 4 — Background Refresh Job (`jobs.py`)
+Replace the current `forecast_cache` blob approach with per-campground per-date rows in the `forecasts` table. Scheduler logic:
 
 ```python
-from apscheduler.schedulers.background import BackgroundScheduler
-
 def refresh_all_forecasts():
-    campgrounds = db.get_all_campgrounds()
-    for batch in chunks(campgrounds, 300):       # Open-Meteo max ~300 per request
-        data = weather.fetch_open_meteo_batch(batch)
-        for cg_id, days in data.items():
-            db.upsert_forecasts(cg_id, days)
-
-def start_scheduler():
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(refresh_all_forecasts, 'interval', hours=6, id='weather_refresh')
-    scheduler.start()
-    refresh_all_forecasts()  # run immediately on startup
+    campgrounds = db.get_all_campgrounds()     # all rows from campgrounds table
+    for batch in chunks(campgrounds, 300):     # Open-Meteo max ~300 lat/lon per request
+        raw = fetch_open_meteo_batch(batch, horizon=10)
+        db.upsert_forecasts(raw)              # write to forecasts table
+    # 3,500 camps = 12 requests / 6h  ← trivial
+    # 50,000 camps = 167 requests / 6h ← still fine
 ```
 
-Started in `app/__init__.py` inside the Flask app factory, guarded by `os.environ.get('WERKZEUG_RUN_MAIN')` so it doesn't double-start in dev mode.
+Open-Meteo is free for non-commercial use, no key required. At this volume, no rate limiting.
 
----
+### 2D — Query-Time Route (zero external calls)
 
-## Phase 5 — Flask Routes (`routes.py`)
+When a user submits a location, the flow becomes:
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/plan` | Renders dashboard; reads campgrounds + forecasts from DB |
-| GET | `/api/forecast` | Returns scored grid JSON; accepts `lat, lon, radius, threshold, horizon, departure` params |
-| GET | `/api/health` | Returns campground count + forecast last-refreshed timestamp |
-
-Query-time flow in `/api/forecast`:
-1. Geocode origin (Nominatim) if lat/lon not already in params
-2. `db.get_campgrounds_near(lat, lon, radius)` — pure DB read
-3. `db.get_forecasts(campground_ids)` — pure DB read
-4. `build_grid()` → `build_top3()` — pure Python
-5. Return JSON
-
-Zero external API calls in the hot path.
-
----
-
-## Phase 6 — Docker
-
-**`docker-compose.yml`** — adds a named volume for the SQLite database:
-
-```yaml
-services:
-  web:
-    build: .
-    ports:
-      - "5000:5000"
-    volumes:
-      - db_data:/app/data
-    environment:
-      - DATABASE_PATH=/app/data/traveler.db
-      - RIDB_API_KEY=${RIDB_API_KEY:-}   # optional; skips RIDB ingest if absent
-
-volumes:
-  db_data:
+```
+POST /api/forecast  { origin_lat, origin_lon, radius, threshold, horizon, departure_day }
+  → SELECT campgrounds within radius (Haversine, bounding-box pre-filter in SQL)
+  → JOIN forecasts WHERE forecast_date IN (...) AND refreshed_at > now - 6h
+  → compute direction/distance from origin to each campground
+  → run dry_window + trip_score  (unchanged Python functions)
+  → return ranked JSON
 ```
 
-The `data/` directory is the only stateful thing. Backup = copy `traveler.db`.
+No Nominatim call at query time — that's already done client-side. No Open-Meteo call at query time — forecasts come from DB. A single SQLite read returning hundreds of rows is sub-millisecond.
+
+### 2E — Radius Slider in UI
+
+Add to the sidebar control panel:
+```
+05 / SEARCH RADIUS
+[──●──────] 200 mi
+  50    300
+```
+
+Passes `radius` to the API. The SQL filters campgrounds by bounding box then Haversine. No new API calls — all data is already in the DB regardless of radius.
+
+**Deliverable:** User in Denver types their zip, sees 200 Colorado campgrounds ranked by forecast quality. User in Maine sees Maine campgrounds. Cincinnati curated list is always present as the fallback/default.
 
 ---
 
-## Build Order
+## Sprint 3 — Shareable URLs (v4)
+**Effort:** 1 day  
+**Goal:** Send someone your exact view.
 
-| # | Phase | Deliverable |
-|---|-------|-------------|
-| 1 | DB layer | `db.py` — schema, queries, WAL mode |
-| 2 | Ingest | `ingest.py` — curated YAML → DB (v1), RIDB + Overpass (v2) |
-| 3 | Weather pipeline | `weather.py` — unchanged logic, batch-friendly interface |
-| 4 | Background job | `jobs.py` + scheduler wired into app factory |
-| 5 | Flask routes | `routes.py` — reads from DB instead of live fetch |
-| 6 | UI | Templates + JS (same as v0) |
-| 7 | Docker | Add volume mount, env var for DB path |
+All controls serialized into URL params. Flask reads them on load and pre-populates the form. JS keeps the URL in sync as sliders change.
+
+```
+travel.henzi.org/?lat=39.10&lon=-84.51&origin=Cincinnati+OH&radius=200&threshold=30&horizon=7&dep=2
+```
+
+```python
+# routes.py
+origin_lat = request.args.get('lat', 39.1031, type=float)
+origin_lon = request.args.get('lon', -84.5120, type=float)
+# ... pre-populate all defaults
+```
+
+```javascript
+// app.js — update URL on every slider change
+function syncUrl() {
+    const params = new URLSearchParams({ lat: originLat, lon: originLon, ... });
+    history.replaceState(null, '', '?' + params.toString());
+}
+```
+
+"Copy Link" button in sidebar. No backend work beyond reading query params.
+
+**Deliverable:** Shareable URL that restores your exact session.
 
 ---
 
-## Definition of Done
+## Sprint 4 — Saved Favorites (v3)
+**Effort:** 1 weekend  
+**Goal:** Power users curate their go-to spots.
 
-- App runs via `docker compose up` with no API keys required (RIDB key is optional)
-- On first start: curated destinations ingested from YAML, forecasts fetched for all of them
-- Adjusting sliders re-scores from cached DB data — no external API calls
-- Forecast data survives container restarts (volume-mounted SQLite)
-- `/api/health` returns campground count and last refresh timestamp
-- Gunicorn workers can read DB concurrently without locking (WAL mode)
-- Background refresh job runs every 6 hours without blocking request workers
+Pure client-side — no backend, no auth.
+
+- Heart icon on each table row
+- Saves `{name, lat, lon, direction}` to `localStorage`
+- "My List" toggle button in sidebar filters the grid to saved camps only
+- My List camps always appear in results even if outside the radius slider
+- Optional: Export as `.yml` (same format as `destinations.yml` for self-hosters)
+
+**Deliverable:** Returning users see their regular spots without re-filtering.
+
+---
+
+## Sprint 5 — Mobile (v5)
+**Effort:** 1 weekend  
+**Goal:** Usable on the trail.
+
+The current grid is data-dense and desktop-first. A card view for phones:
+- Each camp gets a compact card: name, direction badge, score, 3-day strip
+- Sorted by score
+- Toggle between grid and card view (saved to localStorage)
+- No backend changes
+
+**Deliverable:** Works from a campsite parking lot on a 375px screen.
+
+---
+
+## Milestone Summary
+
+| Sprint | Ships | Effort | Blocker |
+|---|---|---|---|
+| **1 — Deploy** | `travel.henzi.org` live, SSL | 1 afternoon | DNS propagation (5–30 min) |
+| **2 — Discovery** | Any US location, radius slider, thousands of parks | 2–3 weekends | RIDB API key (free, instant) |
+| **3 — Share** | Copy link, URL-encoded state | 1 day | None |
+| **4 — Favorites** | Heart icon, My List, localStorage | 1 weekend | None |
+| **5 — Mobile** | Card view, touch-friendly | 1 weekend | None |
+
+---
+
+## Architecture at Each Stage
+
+**Now (post Sprint 1):**
+```
+User → Nginx → Flask/Gunicorn (2 workers) → SQLite (read)
+Scheduler container → Open-Meteo → SQLite (write, every 6h)
+Campground source: destinations.yml (50 curated camps)
+```
+
+**After Sprint 2:**
+```
+User → Nginx → Flask/Gunicorn → SQLite campgrounds + forecasts (read)
+Scheduler → RIDB + Overpass (daily, campground ingestion)
+Scheduler → Open-Meteo (every 6h, forecasts for all ~50k campgrounds)
+Campground source: SQLite (curated + RIDB + OSM)
+```
+
+**If it goes viral:**
+```
+Same stack. Add Redis to cache scored results per (geohash + settings).
+Scale Flask workers horizontally. Swap SQLite for Postgres only if
+you need multi-server writes (forecast data > single-server).
+```
+
+---
+
+## Files to Build in Sprint 2
+
+| File | What it does |
+|---|---|
+| `app/ingest.py` | YAML + RIDB + Overpass → `campgrounds` table |
+| `app/db.py` (extend) | `campgrounds` table, `forecasts` table, Haversine query |
+| `app/jobs.py` (extend) | Run ingestion daily, weather refresh every 6h |
+| `app/weather.py` (extend) | `fetch_open_meteo_batch` that writes to `forecasts` table |
+| `app/routes.py` (extend) | Accept `radius`, query campgrounds from DB instead of YAML |
+| `docker-compose.yml` | Add `RIDB_API_KEY` env var |

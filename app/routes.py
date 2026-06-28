@@ -3,11 +3,12 @@ import math
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify
 from .destinations import load_destinations
-from .weather import build_grid, build_top3, cache_last_updated
+from .weather import build_grid, build_top3, build_grid_from_db, cache_last_updated
+from . import db
 
 bp = Blueprint('main', __name__)
 
-DEFAULTS = dict(threshold=30, horizon=7, departure_day=2, temp_threshold=82)
+DEFAULTS = dict(threshold=30, horizon=7, departure_day=2, temp_threshold=82, radius=200)
 CINCINNATI = (39.1031, -84.5120)
 
 
@@ -41,6 +42,25 @@ def _format_updated(ts):
     return f'{delta // 3600}h {(delta % 3600) // 60}m ago'
 
 
+def _rows_from_db(olat, olon, radius, horizon, threshold):
+    """
+    Query campgrounds within radius, attach pre-computed forecasts, build grid.
+    Returns None if the DB has no campgrounds or stale/missing forecasts.
+    """
+    campgrounds = db.get_campgrounds_near(olat, olon, radius)
+    if not campgrounds:
+        return None
+    if not db.forecasts_fresh():
+        return None
+
+    for camp in campgrounds:
+        camp['direction'] = _bearing_to_dir(_bearing(olat, olon, camp['lat'], camp['lon']))
+
+    camp_ids = [c['id'] for c in campgrounds]
+    db_forecasts = db.get_forecasts_for_camps(camp_ids, horizon)
+    return build_grid_from_db(campgrounds, db_forecasts, threshold)
+
+
 @bp.route('/')
 def index():
     destinations = load_destinations()
@@ -57,6 +77,7 @@ def index():
         threshold=t,
         departure_day=dep,
         temp_threshold=tt,
+        radius=DEFAULTS['radius'],
         top3=top3,
         best=best,
         last_updated=_format_updated(cache_last_updated()),
@@ -68,25 +89,38 @@ def index():
 @bp.route('/api/forecast', methods=['POST'])
 def forecast():
     body = request.get_json(force=True)
-    threshold     = int(body.get('threshold', DEFAULTS['threshold']))
-    horizon       = int(body.get('horizon', DEFAULTS['horizon']))
-    departure_day = int(body.get('departure_day', DEFAULTS['departure_day']))
+    threshold      = int(body.get('threshold', DEFAULTS['threshold']))
+    horizon        = int(body.get('horizon', DEFAULTS['horizon']))
+    departure_day  = int(body.get('departure_day', DEFAULTS['departure_day']))
     temp_threshold = int(body.get('temp_threshold', DEFAULTS['temp_threshold']))
-    force         = bool(body.get('force', False))
-    origin_lat    = body.get('origin_lat')
-    origin_lon    = body.get('origin_lon')
-    destinations  = load_destinations()
+    radius         = int(body.get('radius', DEFAULTS['radius']))
+    force          = bool(body.get('force', False))
+    origin_lat     = body.get('origin_lat')
+    origin_lon     = body.get('origin_lon')
+
+    rows = None
+
     if origin_lat is not None and origin_lon is not None:
-        _recompute_directions(destinations, float(origin_lat), float(origin_lon))
-    rows = build_grid(destinations, horizon=horizon, threshold=threshold, force=force)
+        olat, olon = float(origin_lat), float(origin_lon)
+        rows = _rows_from_db(olat, olon, radius, horizon, threshold)
+
+    if rows is None:
+        # fallback: curated YAML + legacy forecast_cache
+        destinations = load_destinations()
+        if origin_lat is not None and origin_lon is not None:
+            _recompute_directions(destinations, float(origin_lat), float(origin_lon))
+        rows = build_grid(destinations, horizon=horizon, threshold=threshold, force=force)
+
     top3 = build_top3(rows, departure_day=departure_day, threshold=threshold, temp_threshold=temp_threshold)
     best = rows[0] if rows else None
+
     return jsonify({
         'rows': rows,
         'horizon': horizon,
         'threshold': threshold,
         'departure_day': departure_day,
         'temp_threshold': temp_threshold,
+        'radius': radius,
         'top3': top3,
         'best': best,
         'last_updated': _format_updated(cache_last_updated()),

@@ -18,6 +18,7 @@ services:
       - db_data:/app/data
     environment:
       - DATABASE_PATH=/app/data/traveler.db
+      - RIDB_API_KEY=${RIDB_API_KEY:-}
     restart: unless-stopped
 
 volumes:

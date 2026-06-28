@@ -89,6 +89,15 @@
         </div>
       </div>
 
+      <div class="bur-ctl">
+        <div class="bur-ctl-hdr">
+          <span class="bur-ctl-num">05 / SEARCH RADIUS</span>
+          <span class="bur-ctl-val" id="radius-val">{{ radius }} mi</span>
+        </div>
+        <input type="range" id="radius" min="50" max="500" step="25" value="{{ radius }}" />
+        <div class="bur-ctl-ends"><span>50 mi</span><span>500 mi</span></div>
+      </div>
+
       <div class="bur-sidebar-status">
         <div class="bur-status-text">
           STATUS: OK &mdash; <span id="station-count">{{ rows | length }}</span>

@@ -4,6 +4,8 @@
   const thresholdVal    = document.getElementById('threshold-val');
   const tempInput       = document.getElementById('temp-threshold');
   const tempVal         = document.getElementById('temp-threshold-val');
+  const radiusInput     = document.getElementById('radius');
+  const radiusVal       = document.getElementById('radius-val');
   const horizonBtns     = document.querySelectorAll('.bur-horizon-btn');
   const departGrid      = document.getElementById('depart-btns');
   const picksContainer  = document.getElementById('picks-container');
@@ -42,6 +44,7 @@
   let originLat     = 39.1031;
   let originLon     = -84.5120;
   let originLabel   = 'Cincinnati, OH';
+  let radius        = parseInt(radiusInput?.value || '200', 10);
 
   /* ── HELPERS ── */
   function dayName(dateStr) {
@@ -486,6 +489,7 @@
         force: !!force,
         origin_lat: originLat,
         origin_lon: originLon,
+        radius,
       }),
     })
       .then(r => r.json())
@@ -543,6 +547,13 @@
     if (tempVal) tempVal.textContent = tempInput.value + '°F';
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => refresh(false), 300);
+  });
+
+  radiusInput?.addEventListener('input', () => {
+    radius = parseInt(radiusInput.value, 10);
+    if (radiusVal) radiusVal.textContent = radius + ' mi';
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => refresh(false), 400);
   });
 
   horizonBtns.forEach(btn => {
