@@ -1,9 +1,12 @@
+import logging
 import time
 import math
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify
+
+log = logging.getLogger(__name__)
 from .destinations import load_destinations
-from .weather import build_grid, build_top3, build_grid_from_db, cache_last_updated
+from .weather import build_grid, build_top3, build_grid_from_db, refresh_forecasts_for, cache_last_updated
 from . import db
 
 bp = Blueprint('main', __name__)
@@ -45,18 +48,26 @@ def _format_updated(ts):
 def _rows_from_db(olat, olon, radius, horizon, threshold):
     """
     Query campgrounds within radius, attach pre-computed forecasts, build grid.
-    Returns None if the DB has no campgrounds or stale/missing forecasts.
+    If any campgrounds have stale/missing forecasts, triggers an on-demand fetch
+    before returning — so the first user in a new area always gets real data.
+    Returns None if the DB has no campgrounds at all.
     """
     campgrounds = db.get_campgrounds_near(olat, olon, radius)
     if not campgrounds:
-        return None
-    if not db.forecasts_fresh():
         return None
 
     for camp in campgrounds:
         camp['direction'] = _bearing_to_dir(_bearing(olat, olon, camp['lat'], camp['lon']))
 
     camp_ids = [c['id'] for c in campgrounds]
+
+    stale = db.stale_camp_ids(camp_ids)
+    if stale:
+        stale_camps = [c for c in campgrounds if c['id'] in set(stale)]
+        log.info('On-demand fetch for %d stale campgrounds near (%.4f, %.4f)',
+                 len(stale_camps), olat, olon)
+        refresh_forecasts_for(stale_camps, horizon=horizon)
+
     db_forecasts = db.get_forecasts_for_camps(camp_ids, horizon)
     return build_grid_from_db(campgrounds, db_forecasts, threshold)
 

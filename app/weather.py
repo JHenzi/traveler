@@ -6,6 +6,20 @@ log = logging.getLogger(__name__)
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 BATCH_SIZE = 300  # Open-Meteo practical limit per request
 
+# Conservative self-imposed cap: 200 Open-Meteo calls/hour.
+# Their free tier has no published hard limit, but this keeps us polite.
+OPEN_METEO_HOURLY_CAP = 200
+
+
+def _check_rate_limit():
+    """Raise if we've exceeded our self-imposed hourly cap."""
+    count = db.api_call_count('open-meteo', window_seconds=3600)
+    if count >= OPEN_METEO_HOURLY_CAP:
+        raise RuntimeError(
+            f'Open-Meteo rate cap reached: {count} calls in the last hour '
+            f'(cap={OPEN_METEO_HOURLY_CAP}). Skipping fetch.'
+        )
+
 
 def cache_last_updated():
     return db.cache_last_updated()
@@ -27,6 +41,11 @@ def refresh_campground_forecasts(horizon=10):
 
     total = 0
     for i in range(0, len(campgrounds), BATCH_SIZE):
+        try:
+            _check_rate_limit()
+        except RuntimeError as exc:
+            log.warning('Bulk refresh paused at batch %d: %s', i, exc)
+            break
         batch = campgrounds[i:i + BATCH_SIZE]
         try:
             _fetch_and_store_batch(batch, horizon)
@@ -35,6 +54,28 @@ def refresh_campground_forecasts(horizon=10):
             log.error('Batch %d-%d failed: %s', i, i + len(batch), exc)
 
     log.info('Forecast refresh complete — %d campgrounds updated', total)
+
+
+def refresh_forecasts_for(campgrounds, horizon=10):
+    """
+    On-demand fetch for a specific list of campgrounds.
+    Called from routes.py when a user requests an area with stale/missing forecasts.
+    Respects the hourly rate cap before fetching.
+    """
+    try:
+        _check_rate_limit()
+    except RuntimeError as exc:
+        log.warning('On-demand fetch blocked: %s', exc)
+        return
+
+    for i in range(0, len(campgrounds), BATCH_SIZE):
+        batch = campgrounds[i:i + BATCH_SIZE]
+        try:
+            _fetch_and_store_batch(batch, horizon)
+        except Exception as exc:
+            log.error('On-demand batch failed: %s', exc)
+
+    log.info('On-demand forecast fetch complete — %d campgrounds', len(campgrounds))
 
 
 def _fetch_and_store_batch(campgrounds, horizon):
@@ -48,6 +89,7 @@ def _fetch_and_store_batch(campgrounds, horizon):
         'timezone':      'America/New_York',
         'temperature_unit': 'fahrenheit',
     }
+    db.log_api_call('open-meteo')
     resp = requests.get(OPEN_METEO_URL, params=params, timeout=30)
     resp.raise_for_status()
     data = resp.json()
@@ -128,6 +170,7 @@ def fetch_forecasts(destinations, horizon=7, force=False):
         "temperature_unit": "fahrenheit",
     }
 
+    db.log_api_call('open-meteo')
     resp = requests.get(OPEN_METEO_URL, params=params, timeout=10)
     resp.raise_for_status()
     data = resp.json()

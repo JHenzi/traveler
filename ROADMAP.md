@@ -20,6 +20,45 @@ Database size is not a concern: 10,000 campgrounds × 7 days × ~100 bytes ≈ *
 
 ---
 
+## The "New Area" Problem — On-Demand Fetching
+
+**The scenario:** A user in Denver arrives. The scheduler has ingested Denver campgrounds, but their forecasts haven't been fetched yet (first boot, or the scheduler is mid-cycle). The user gets empty or stale results.
+
+**What we can't do:** Trigger ingestion (Overpass/RIDB) per user request. Those are slow (seconds to minutes), rate-limited, and only need to run daily. Campground *locations* are a solved problem — they're all in the DB.
+
+**What we can do:** Trigger an Open-Meteo forecast fetch on demand for the specific campgrounds the user needs. Open-Meteo accepts 300 lat/lon pairs per request. A 200-mile radius around Denver might return 150 campgrounds — that's a single HTTP call taking ~2 seconds.
+
+**The flow:**
+```
+User requests Denver, radius=200mi
+  → DB query returns 150 campgrounds in range
+  → Check: which of those have fresh forecasts? (refreshed_at > now - 7h)
+  → Stale campgrounds: fetch from Open-Meteo RIGHT NOW (1 request, ~2s)
+  → Write to forecasts table
+  → Return results to user
+```
+
+Subsequent users hitting the same area get served entirely from DB — no API call.
+
+**Rate limit protection:** All Open-Meteo calls (both scheduler bulk and on-demand) are logged to an `api_log` table. Before any fetch, we check the count for the past hour. Self-imposed cap: 200 calls/hour (the actual Open-Meteo free tier limit is much higher, but this prevents runaway loops).
+
+### API Limits Reference
+
+| Service | Key required | Published limit | Our self-imposed cap |
+|---|---|---|---|
+| Open-Meteo | No | "Fair use", ~10k req/day safe | 200 req/hour, logged in `api_log` |
+| Nominatim (geocoding) | No | 1 req/sec | Client-side, 1 req per user action |
+| RIDB (Recreation.gov) | Yes (free) | Not published; polite use | Run once daily, 0.25s delay between states |
+| Overpass (OSM) | No | "Polite use", 1 req/2s | Run once daily, 2s delay between regions |
+
+### What Doesn't Need Rate Limiting
+
+- **DB reads** — pure SQLite, no external service, unlimited
+- **Nominatim** — called client-side (JS), one call per user location change, well within their 1 req/sec limit
+- **Scoring algorithm** — pure Python, no I/O
+
+---
+
 ## Current State (v0 — Cincinnati-Hardcoded)
 
 Working Flask app:

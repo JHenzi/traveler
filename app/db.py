@@ -49,6 +49,14 @@ def init_db():
         )
     ''')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_camps_latlon ON campgrounds(lat, lon)')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS api_log (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            service    TEXT NOT NULL,
+            called_at  REAL NOT NULL
+        )
+    ''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_api_log_svc ON api_log(service, called_at)')
     conn.commit()
     conn.close()
 
@@ -204,3 +212,57 @@ def forecasts_fresh(max_age_hours=7):
     if not row or not row['ts']:
         return False
     return (time.time() - row['ts']) < max_age_hours * 3600
+
+
+def forecasts_fresh_for(camp_ids, max_age_hours=7):
+    """True if every camp_id in the list has at least one fresh forecast row."""
+    if not camp_ids:
+        return False
+    cutoff = time.time() - max_age_hours * 3600
+    placeholders = ','.join('?' * len(camp_ids))
+    conn = _conn()
+    row = conn.execute(
+        f'''SELECT COUNT(DISTINCT campground_id) FROM forecasts
+            WHERE campground_id IN ({placeholders}) AND refreshed_at > ?''',
+        (*camp_ids, cutoff),
+    ).fetchone()
+    conn.close()
+    return (row[0] if row else 0) >= len(camp_ids)
+
+
+def stale_camp_ids(camp_ids, max_age_hours=7):
+    """Return subset of camp_ids whose forecasts are missing or older than max_age_hours."""
+    if not camp_ids:
+        return []
+    cutoff = time.time() - max_age_hours * 3600
+    placeholders = ','.join('?' * len(camp_ids))
+    conn = _conn()
+    fresh = set(
+        r[0] for r in conn.execute(
+            f'''SELECT DISTINCT campground_id FROM forecasts
+                WHERE campground_id IN ({placeholders}) AND refreshed_at > ?''',
+            (*camp_ids, cutoff),
+        ).fetchall()
+    )
+    conn.close()
+    return [cid for cid in camp_ids if cid not in fresh]
+
+
+# ── API RATE TRACKING ─────────────────────────────────────────────────────────
+
+def log_api_call(service):
+    conn = _conn()
+    conn.execute('INSERT INTO api_log (service, called_at) VALUES (?, ?)',
+                 (service, time.time()))
+    conn.commit()
+    conn.close()
+
+
+def api_call_count(service, window_seconds=3600):
+    conn = _conn()
+    n = conn.execute(
+        'SELECT COUNT(*) FROM api_log WHERE service=? AND called_at > ?',
+        (service, time.time() - window_seconds),
+    ).fetchone()[0]
+    conn.close()
+    return n
