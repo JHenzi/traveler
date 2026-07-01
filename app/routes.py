@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify
 
 log = logging.getLogger(__name__)
 from .destinations import load_destinations
-from .weather import build_grid, build_top3, build_grid_from_db, refresh_forecasts_for, cache_last_updated
+from .weather import build_grid, build_top3, build_grid_from_db, refresh_forecasts_for, is_rate_limited, cache_last_updated
 from . import db
 
 bp = Blueprint('main', __name__)
@@ -66,14 +66,20 @@ def _rows_from_db(olat, olon, radius, horizon, threshold):
 
     if stale:
         stale_camps = [c for c in campgrounds if c['id'] in set(stale)]
-        log.info('Background fetch started for %d stale campgrounds near (%.4f, %.4f)',
-                 len(stale_camps), olat, olon)
-        threading.Thread(
-            target=refresh_forecasts_for,
-            args=(stale_camps,),
-            kwargs={'horizon': horizon},
-            daemon=True,
-        ).start()
+        if is_rate_limited():
+            # Cap already hit — don't spawn a doomed thread, don't tell the UI to poll.
+            log.info('Stale camps (%d) exist but rate-limited — serving cached data without poll banner',
+                     len(stale_camps))
+            stale = []
+        else:
+            log.info('Background fetch started for %d stale campgrounds near (%.4f, %.4f)',
+                     len(stale_camps), olat, olon)
+            threading.Thread(
+                target=refresh_forecasts_for,
+                args=(stale_camps,),
+                kwargs={'horizon': horizon},
+                daemon=True,
+            ).start()
 
     db_forecasts = db.get_forecasts_for_camps(camp_ids, horizon)
     rows = build_grid_from_db(campgrounds, db_forecasts, threshold)
@@ -83,9 +89,19 @@ def _rows_from_db(olat, olon, radius, horizon, threshold):
 
 @bp.route('/')
 def index():
+    t   = int(request.args.get('threshold', DEFAULTS['threshold']))
+    h   = int(request.args.get('horizon',   DEFAULTS['horizon']))
+    dep = int(request.args.get('dep',       DEFAULTS['departure_day']))
+    tt  = int(request.args.get('temp',      DEFAULTS['temp_threshold']))
+    r   = int(request.args.get('radius',    DEFAULTS['radius']))
+
+    olat_s = request.args.get('lat')
+    olon_s = request.args.get('lon')
+    olabel = request.args.get('origin', 'Cincinnati, OH')
+    olat   = float(olat_s) if olat_s else CINCINNATI[0]
+    olon   = float(olon_s) if olon_s else CINCINNATI[1]
+
     destinations = load_destinations()
-    t, h, dep = DEFAULTS['threshold'], DEFAULTS['horizon'], DEFAULTS['departure_day']
-    tt = DEFAULTS['temp_threshold']
     rows = build_grid(destinations, horizon=h, threshold=t)
     top3 = build_top3(rows, departure_day=dep, threshold=t, temp_threshold=tt)
     best = rows[0] if rows else None
@@ -97,12 +113,15 @@ def index():
         threshold=t,
         departure_day=dep,
         temp_threshold=tt,
-        radius=DEFAULTS['radius'],
+        radius=r,
         top3=top3,
         best=best,
         last_updated=_format_updated(cache_last_updated()),
         bulletin_no=f"{now.strftime('%y')}-{now.timetuple().tm_yday:03d}",
         today=now.strftime('%m·%d'),
+        origin_lat=olat,
+        origin_lon=olon,
+        origin_label=olabel,
     )
 
 

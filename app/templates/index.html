@@ -18,7 +18,7 @@
     <div class="bur-header-logo">WX</div>
     <div class="bur-header-title">
       <div class="bur-header-name">National Camp Forecast Bureau</div>
-      <div class="bur-header-sub">DRY-WINDOW DISPATCH &nbsp;/&nbsp; ESCAPE-THE-RAIN ROUTING &nbsp;/&nbsp; STATION: <span id="header-station">CINCINNATI OH</span></div>
+      <div class="bur-header-sub">DRY-WINDOW DISPATCH &nbsp;/&nbsp; ESCAPE-THE-RAIN ROUTING &nbsp;/&nbsp; STATION: <span id="header-station">{{ origin_label | upper }}</span></div>
     </div>
     <div class="bur-header-meta">
       <div class="bur-bulletin-label">BULLETIN No.</div>
@@ -40,16 +40,21 @@
 
     <!-- SIDEBAR -->
     <aside class="bur-sidebar">
-      <div class="bur-sidebar-hdr">Routing Parameters</div>
+      <div class="bur-sidebar-hdr">
+        Routing Parameters
+        <button class="bur-sidebar-toggle" id="sidebar-toggle" aria-label="Toggle controls">&#9660;</button>
+      </div>
+
+      <div class="bur-sidebar-body" id="sidebar-body">
 
       <div class="bur-ctl bur-ctl--padded">
         <div class="bur-ctl-num bur-ctl-num--solo">00 / YOUR LOCATION</div>
         <div class="bur-location-row">
           <input type="text" id="location-input" class="bur-location-input"
-            placeholder="City, state or zip…" value="Cincinnati, OH" autocomplete="off" />
+            placeholder="City, state or zip…" value="{{ origin_label }}" autocomplete="off" />
           <button class="bur-location-btn" id="location-btn" title="Update location">&#8594;</button>
         </div>
-        <div class="bur-location-status" id="location-status">Default: Cincinnati, OH</div>
+        <div class="bur-location-status" id="location-status">{{ origin_label }}</div>
       </div>
 
       <div class="bur-ctl">
@@ -107,9 +112,12 @@
         </div>
         <div class="bur-refresh-row">
           <button class="bur-refresh-btn" id="refresh-btn">&#8635; REFRESH</button>
+          <button class="bur-copy-btn" id="copy-btn" title="Copy shareable link">&#128279; LINK</button>
           <span class="bur-last-updated" id="last-updated">{{ last_updated }}</span>
         </div>
       </div>
+
+      </div><!-- /bur-sidebar-body -->
     </aside>
 
     <!-- MAIN -->
@@ -156,6 +164,18 @@
 
 </div><!-- /bur-sheet -->
 </div><!-- /bur-wrap -->
+<script>
+window.__INIT__ = {
+  lat:       {{ origin_lat }},
+  lon:       {{ origin_lon }},
+  origin:    {{ origin_label | tojson }},
+  threshold: {{ threshold }},
+  temp:      {{ temp_threshold }},
+  horizon:   {{ horizon }},
+  dep:       {{ departure_day }},
+  radius:    {{ radius }}
+};
+</script>
 <script src="/static/app.js"></script>
 </body>
 </html>

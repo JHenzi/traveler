@@ -6,9 +6,11 @@ log = logging.getLogger(__name__)
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 BATCH_SIZE = 100  # keeps GET URLs well under server URI limits (~2.6KB at 100 coords)
 
-# Conservative self-imposed cap: 200 Open-Meteo calls/hour.
-# Their free tier has no published hard limit, but this keeps us polite.
-OPEN_METEO_HOURLY_CAP = 200
+# Open-Meteo free tier is "fair use" — ~10k requests/day is safe.
+# We self-impose a per-hour cap to prevent runaway loops, not to stay under their limit.
+# A full scheduler refresh of 500 previously-cached camps = 5 calls.
+# On-demand fetches add a handful more. 600/hour gives plenty of headroom.
+OPEN_METEO_HOURLY_CAP = 600
 
 
 def _check_rate_limit():
@@ -21,6 +23,11 @@ def _check_rate_limit():
         )
 
 
+def is_rate_limited():
+    """True if we're currently at the hourly cap. Used by routes.py to avoid useless thread spawns."""
+    return db.api_call_count('open-meteo', window_seconds=3600) >= OPEN_METEO_HOURLY_CAP
+
+
 def cache_last_updated():
     return db.cache_last_updated()
 
@@ -31,12 +38,18 @@ def cache_invalidate():
 
 def refresh_campground_forecasts(horizon=10):
     """
-    Fetch weather for every campground in the DB and write to the forecasts table.
-    Called by the scheduler every 6 hours. Batches 300 campgrounds per Open-Meteo request.
+    Refresh forecasts only for campgrounds that have been previously fetched (have existing
+    forecast rows). New campgrounds get their first forecast via on-demand fetch when a user
+    queries their area — the scheduler only keeps already-active camps fresh.
+
+    This keeps scheduler load proportional to actual usage, not total DB size.
+    With 15k+ Overpass camps in the DB, fetching all of them every 6h would blow
+    through any rate cap. Only fetching the ~few-hundred that users have actually
+    queried is sustainable indefinitely.
     """
-    campgrounds = db.get_all_campgrounds()
+    campgrounds = db.get_campgrounds_with_forecasts()
     if not campgrounds:
-        log.warning('No campgrounds in DB — skipping forecast refresh')
+        log.info('No previously-fetched campgrounds — skipping scheduler refresh (on-demand will populate)')
         return
 
     total = 0

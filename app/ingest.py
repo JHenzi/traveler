@@ -129,12 +129,20 @@ def ingest_overpass():
 
 
 def _fetch_overpass_region(south, north, west, east):
+    # Only pull ESTABLISHED, publicly-accessible campgrounds — not every private
+    # camp_site node in OSM. We require at least one of: operator tag, fee tag,
+    # or toilet/shower facilities. This keeps out primitive dispersed sites,
+    # private backyards, and individual tent pads within larger campgrounds.
+    # access=private is explicitly excluded.
     query = f'''
-    [out:json][timeout:60];
+    [out:json][timeout:90];
     (
-      way["tourism"="camp_site"]["name"]({south},{west},{north},{east});
-      relation["tourism"="camp_site"]["name"]({south},{west},{north},{east});
-      way["leisure"="nature_reserve"]["tourism"="camp_site"]({south},{west},{north},{east});
+      way["tourism"="camp_site"]["name"]["access"!="private"]["operator"]({south},{west},{north},{east});
+      relation["tourism"="camp_site"]["name"]["access"!="private"]["operator"]({south},{west},{north},{east});
+      way["tourism"="camp_site"]["name"]["access"!="private"]["fee"]({south},{west},{north},{east});
+      relation["tourism"="camp_site"]["name"]["access"!="private"]["fee"]({south},{west},{north},{east});
+      way["tourism"="camp_site"]["name"]["access"!="private"]["toilets"]({south},{west},{north},{east});
+      relation["tourism"="camp_site"]["name"]["access"!="private"]["toilets"]({south},{west},{north},{east});
     );
     out center;
     '''
@@ -162,10 +170,36 @@ def _fetch_overpass_region(south, north, west, east):
     return records
 
 
+# ── CLEANUP ──────────────────────────────────────────────────────────────────
+
+def purge_overpass_entries():
+    """
+    Remove all campgrounds ingested from the old broad Overpass query
+    (every tourism=camp_site in the US — ~15,000 entries including private sites,
+    individual tent pads, and primitive dispersed spots).
+
+    Called once on startup to clean the DB before re-ingesting with the tighter
+    query that requires operator/fee/toilets tags (established public campgrounds only).
+    """
+    conn = db._conn()
+    deleted = conn.execute(
+        "DELETE FROM campgrounds WHERE source = 'overpass'"
+    ).rowcount
+    # Cascade would clean forecasts, but enforce it explicitly for safety
+    conn.execute(
+        "DELETE FROM forecasts WHERE campground_id NOT IN (SELECT id FROM campgrounds)"
+    )
+    conn.commit()
+    conn.close()
+    if deleted:
+        log.info('Purged %d low-quality overpass campgrounds from DB', deleted)
+
+
 # ── ORCHESTRATOR ─────────────────────────────────────────────────────────────
 
 def run_full_ingestion():
     log.info('Starting campground ingestion')
+    purge_overpass_entries()   # clean old broad-scrape data before re-ingesting
     seed_curated()
     ingest_ridb()
     ingest_overpass()

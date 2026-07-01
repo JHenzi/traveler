@@ -40,14 +40,25 @@
   let forecastDates = [];
   let currentRows   = [];
   let focusName     = null;
-  let horizon       = parseInt(document.querySelector('.bur-horizon-btn.active')?.dataset.val || '7', 10);
-  let departIdx     = parseInt(document.querySelector('.bur-depart-btn.active')?.dataset.day || '2', 10) - 1;
   let debounceTimer  = null;
   let fetchingTimer  = null;
-  let originLat     = 39.1031;
-  let originLon     = -84.5120;
-  let originLabel   = 'Cincinnati, OH';
-  let radius        = parseInt(radiusInput?.value || '150', 10);
+
+  // Seed state from server-rendered __INIT__ (supports shareable URLs)
+  const _I = window.__INIT__ || {};
+  let originLat   = _I.lat       || 39.1031;
+  let originLon   = _I.lon       || -84.5120;
+  let originLabel = _I.origin    || 'Cincinnati, OH';
+  let horizon     = _I.horizon   || parseInt(document.querySelector('.bur-horizon-btn.active')?.dataset.val || '7', 10);
+  let departIdx   = (_I.dep != null ? _I.dep : parseInt(document.querySelector('.bur-depart-btn.active')?.dataset.day || '2', 10)) - 1;
+  let radius      = _I.radius    || parseInt(radiusInput?.value || '150', 10);
+
+  // Apply any URL-seeded slider values
+  if (_I.threshold  && thresholdInput) thresholdInput.value = _I.threshold;
+  if (_I.temp       && tempInput)       tempInput.value      = _I.temp;
+  if (_I.radius     && radiusInput)     radiusInput.value    = _I.radius;
+  if (_I.threshold  && thresholdVal)    thresholdVal.textContent  = _I.threshold + '%';
+  if (_I.temp       && tempVal)         tempVal.textContent        = _I.temp + '°F';
+  if (_I.radius     && radiusVal)       radiusVal.textContent      = _I.radius + ' mi';
 
   /* ── HELPERS ── */
   function dayName(dateStr) {
@@ -596,24 +607,68 @@
       .replace(/"/g, '&quot;');
   }
 
+  /* ── SHAREABLE URL ── */
+  function syncUrl() {
+    const params = new URLSearchParams({
+      lat:       originLat.toFixed(4),
+      lon:       originLon.toFixed(4),
+      origin:    originLabel,
+      threshold: getThreshold(),
+      temp:      getTempThreshold(),
+      horizon,
+      dep:       departIdx + 1,
+      radius,
+    });
+    history.replaceState(null, '', '?' + params.toString());
+  }
+
+  /* ── SIDEBAR TOGGLE (mobile) ── */
+  const sidebarToggle = document.getElementById('sidebar-toggle');
+  const sidebarBody   = document.getElementById('sidebar-body');
+  if (sidebarToggle && sidebarBody) {
+    if (window.innerWidth <= 768) {
+      sidebarBody.classList.add('bur-collapsed');
+      sidebarToggle.classList.remove('open');
+    }
+    sidebarToggle.addEventListener('click', () => {
+      const collapsed = sidebarBody.classList.toggle('bur-collapsed');
+      sidebarToggle.classList.toggle('open', !collapsed);
+    });
+  }
+
+  /* ── COPY LINK ── */
+  const copyBtn = document.getElementById('copy-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      syncUrl();
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        const orig = copyBtn.textContent;
+        copyBtn.textContent = '✓ COPIED';
+        setTimeout(() => { copyBtn.textContent = orig; }, 1800);
+      }).catch(() => {
+        window.prompt('Copy this link:', window.location.href);
+      });
+    });
+  }
+
   /* ── EVENT WIRING ── */
   thresholdInput?.addEventListener('input', () => {
     if (thresholdVal) thresholdVal.textContent = thresholdInput.value + '%';
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => refresh(false), 300);
+    debounceTimer = setTimeout(() => { refresh(false); syncUrl(); }, 300);
   });
 
   tempInput?.addEventListener('input', () => {
     if (tempVal) tempVal.textContent = tempInput.value + '°F';
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => refresh(false), 300);
+    debounceTimer = setTimeout(() => { refresh(false); syncUrl(); }, 300);
   });
 
   radiusInput?.addEventListener('input', () => {
     radius = parseInt(radiusInput.value, 10);
     if (radiusVal) radiusVal.textContent = radius + ' mi';
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => refresh(false), 400);
+    debounceTimer = setTimeout(() => { refresh(false); syncUrl(); }, 400);
   });
 
   horizonBtns.forEach(btn => {
@@ -622,6 +677,7 @@
       horizonBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       refresh(false);
+      syncUrl();
     });
   });
 

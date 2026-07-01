@@ -132,6 +132,20 @@ def get_all_campgrounds():
     return [dict(r) for r in rows]
 
 
+def get_campgrounds_with_forecasts():
+    """Return only campgrounds that already have at least one forecast row.
+    Used by the scheduler to avoid fetching weather for all 15k+ Overpass
+    camps — only re-fresh camps users have actually queried."""
+    conn = _conn()
+    rows = conn.execute(
+        '''SELECT DISTINCT c.id, c.name, c.lat, c.lon, c.source, c.state, c.url
+           FROM campgrounds c
+           INNER JOIN forecasts f ON f.campground_id = c.id'''
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def campground_count():
     conn = _conn()
     n = conn.execute('SELECT COUNT(*) FROM campgrounds').fetchone()[0]
