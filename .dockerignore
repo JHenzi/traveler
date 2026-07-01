@@ -5,3 +5,20 @@ __pycache__
 .git
 .env
 *.log
+.venv/
+venv/
+data/
+*.db
+*.db-wal
+*.db-shm
+*.pdf
+.DS_Store
+.vscode/
+dev-plan.md
+ROADMAP.md
+VISION.md
+project-goals.md
+"Camping forecast app redesign"/
+deploy/
+Screenshot*.png
+Robot Diary*.html

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title }} — National Camp Forecast Bureau</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+</head>
+<body class="bur-body">
+<div class="bur-wrap">
+<div class="bur-sheet">
+
+  <div class="bur-header">
+    <div class="bur-header-logo">WX</div>
+    <div class="bur-header-title">
+      <div class="bur-header-name">National Camp Forecast Bureau</div>
+      <div class="bur-header-sub">TRANSMISSION ERROR &nbsp;/&nbsp; CODE {{ code }}</div>
+    </div>
+    <div class="bur-header-meta">
+      <div class="bur-bulletin-label">STATUS</div>
+      <div class="bur-bulletin-no">{{ code }}</div>
+    </div>
+  </div>
+
+  <div class="bur-ticker">
+    <span class="bur-ticker-advisory">&#9632; ADVISORY</span>
+    <span>{{ title | upper }} &mdash; {{ message | upper }}</span>
+  </div>
+
+  <div class="bur-body-grid" style="place-items:center;min-height:40vh;">
+    <div style="text-align:center;padding:3rem 2rem;font-family:'Space Mono',monospace;">
+      <div style="font-size:4rem;font-weight:700;letter-spacing:-.02em;opacity:.15;">{{ code }}</div>
+      <h1 style="font-family:'Oswald',sans-serif;font-size:1.6rem;letter-spacing:.1em;text-transform:uppercase;margin:.5rem 0 1rem;">{{ title }}</h1>
+      <p style="opacity:.7;margin-bottom:.5rem;">{{ message }}</p>
+      <p style="opacity:.5;font-size:.85rem;margin-bottom:2rem;">{{ suggestion }}</p>
+      <a href="/" style="display:inline-block;padding:.6rem 1.6rem;border:1px solid currentColor;text-decoration:none;font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase;font-size:.9rem;">
+        Return to Forecast &rarr;
+      </a>
+    </div>
+  </div>
+
+</div>
+</div>
+</body>
+</html>

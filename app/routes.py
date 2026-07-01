@@ -92,19 +92,42 @@ def _rows_from_db(olat, olon, radius, horizon, threshold):
     return rows, banner_count
 
 
+def _clamp(val, lo, hi):
+    return max(lo, min(hi, val))
+
+
+def _int_param(key, default, lo, hi):
+    try:
+        return _clamp(int(request.args.get(key, default)), lo, hi)
+    except (ValueError, TypeError):
+        return default
+
+
+def _float_param(key, default, lo, hi):
+    try:
+        return _clamp(float(request.args.get(key, default)), lo, hi)
+    except (ValueError, TypeError):
+        return default
+
+
+@bp.route('/health')
+def health():
+    return {'ok': True}, 200
+
+
 @bp.route('/')
 def index():
-    t   = int(request.args.get('threshold', DEFAULTS['threshold']))
-    h   = int(request.args.get('horizon',   DEFAULTS['horizon']))
-    dep = int(request.args.get('dep',       DEFAULTS['departure_day']))
-    tt  = int(request.args.get('temp',      DEFAULTS['temp_threshold']))
-    r   = int(request.args.get('radius',    DEFAULTS['radius']))
+    t   = _int_param('threshold', DEFAULTS['threshold'],   0,   90)
+    h   = _int_param('horizon',   DEFAULTS['horizon'],     1,   16)
+    dep = _int_param('dep',       DEFAULTS['departure_day'], 1, 14)
+    tt  = _int_param('temp',      DEFAULTS['temp_threshold'], 60, 120)
+    r   = _int_param('radius',    DEFAULTS['radius'],      10,  500)
 
     olat_s = request.args.get('lat')
     olon_s = request.args.get('lon')
-    olabel = request.args.get('origin', 'Cincinnati, OH')
-    olat   = float(olat_s) if olat_s else CINCINNATI[0]
-    olon   = float(olon_s) if olon_s else CINCINNATI[1]
+    olabel = request.args.get('origin', 'Cincinnati, OH')[:80]
+    olat   = _float_param('lat', CINCINNATI[0], -90.0, 90.0) if olat_s else CINCINNATI[0]
+    olon   = _float_param('lon', CINCINNATI[1], -180.0, 180.0) if olon_s else CINCINNATI[1]
 
     destinations = load_destinations()
     rows = build_grid(destinations, horizon=h, threshold=t)
@@ -132,15 +155,31 @@ def index():
 
 @bp.route('/api/forecast', methods=['POST'])
 def forecast():
-    body = request.get_json(force=True)
-    threshold      = int(body.get('threshold', DEFAULTS['threshold']))
-    horizon        = int(body.get('horizon', DEFAULTS['horizon']))
-    departure_day  = int(body.get('departure_day', DEFAULTS['departure_day']))
-    temp_threshold = int(body.get('temp_threshold', DEFAULTS['temp_threshold']))
-    radius         = int(body.get('radius', DEFAULTS['radius']))
+    body = request.get_json(force=True, silent=True) or {}
+
+    def _i(key, default, lo, hi):
+        try:
+            return _clamp(int(body.get(key, default)), lo, hi)
+        except (ValueError, TypeError):
+            return default
+
+    def _f(key, lo, hi):
+        v = body.get(key)
+        if v is None:
+            return None
+        try:
+            return _clamp(float(v), lo, hi)
+        except (ValueError, TypeError):
+            return None
+
+    threshold      = _i('threshold',      DEFAULTS['threshold'],      0,    90)
+    horizon        = _i('horizon',        DEFAULTS['horizon'],        1,    16)
+    departure_day  = _i('departure_day',  DEFAULTS['departure_day'],  1,    14)
+    temp_threshold = _i('temp_threshold', DEFAULTS['temp_threshold'], 60,  120)
+    radius         = _i('radius',         DEFAULTS['radius'],         10,  500)
     force          = bool(body.get('force', False))
-    origin_lat     = body.get('origin_lat')
-    origin_lon     = body.get('origin_lon')
+    origin_lat     = _f('origin_lat', -90.0,  90.0)
+    origin_lon     = _f('origin_lon', -180.0, 180.0)
 
     rows = None
     stale_count = 0
