@@ -166,6 +166,7 @@
         document.querySelectorAll('.bur-depart-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         refresh(false);
+        syncUrl();
       });
       departGrid.appendChild(btn);
     }
