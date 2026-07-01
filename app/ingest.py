@@ -132,8 +132,9 @@ def _fetch_overpass_region(south, north, west, east):
     query = f'''
     [out:json][timeout:60];
     (
-      node["tourism"="camp_site"]["name"]({south},{west},{north},{east});
       way["tourism"="camp_site"]["name"]({south},{west},{north},{east});
+      relation["tourism"="camp_site"]["name"]({south},{west},{north},{east});
+      way["leisure"="nature_reserve"]["tourism"="camp_site"]({south},{west},{north},{east});
     );
     out center;
     '''

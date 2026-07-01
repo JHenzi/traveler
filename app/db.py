@@ -139,8 +139,38 @@ def campground_count():
     return n
 
 
+MAX_CAMPGROUNDS_PER_QUERY = 300
+DEDUP_RADIUS_MI = 0.20  # collapse individual sites within the same campground
+
+
+def _deduplicate_nearby(campgrounds):
+    """
+    Drop campgrounds within DEDUP_RADIUS_MI of an already-kept one.
+    List must be sorted by distance (closest to origin first).
+    Prefers curated > ridb > overpass when collapsing clusters — those
+    sources have better centroid accuracy and metadata.
+    """
+    source_rank = {'curated': 0, 'ridb': 1, 'overpass': 2}
+    kept = []
+    for camp in campgrounds:
+        for k in kept:
+            if _haversine_mi(camp['lat'], camp['lon'], k['lat'], k['lon']) < DEDUP_RADIUS_MI:
+                # keep the higher-ranked source if they're the same cluster
+                if source_rank.get(camp['source'], 9) < source_rank.get(k['source'], 9):
+                    kept.remove(k)
+                    kept.append(camp)
+                break
+        else:
+            kept.append(camp)
+    return kept
+
+
 def get_campgrounds_near(lat, lon, radius_mi):
-    """Bounding-box pre-filter in SQL, exact Haversine in Python."""
+    """
+    Bounding-box pre-filter in SQL, exact Haversine in Python.
+    Deduplicates individual campsites that belong to the same campground,
+    then caps results at MAX_CAMPGROUNDS_PER_QUERY.
+    """
     dlat = radius_mi / 69.0
     dlon = radius_mi / (69.0 * math.cos(math.radians(lat)) + 1e-9)
     conn = _conn()
@@ -156,7 +186,8 @@ def get_campgrounds_near(lat, lon, radius_mi):
         if dist <= radius_mi:
             result.append({**dict(r), 'distance_mi': round(dist, 1)})
     result.sort(key=lambda x: x['distance_mi'])
-    return result
+    result = _deduplicate_nearby(result)
+    return result[:MAX_CAMPGROUNDS_PER_QUERY]
 
 
 # ── FORECASTS ────────────────────────────────────────────────────────────────

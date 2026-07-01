@@ -1,4 +1,5 @@
 import logging
+import threading
 import time
 import math
 from datetime import datetime
@@ -11,7 +12,7 @@ from . import db
 
 bp = Blueprint('main', __name__)
 
-DEFAULTS = dict(threshold=30, horizon=7, departure_day=2, temp_threshold=82, radius=200)
+DEFAULTS = dict(threshold=30, horizon=7, departure_day=2, temp_threshold=82, radius=150)
 CINCINNATI = (39.1031, -84.5120)
 
 
@@ -48,28 +49,36 @@ def _format_updated(ts):
 def _rows_from_db(olat, olon, radius, horizon, threshold):
     """
     Query campgrounds within radius, attach pre-computed forecasts, build grid.
-    If any campgrounds have stale/missing forecasts, triggers an on-demand fetch
-    before returning — so the first user in a new area always gets real data.
-    Returns None if the DB has no campgrounds at all.
+    If any campgrounds have stale/missing forecasts, kicks off a background fetch
+    and returns immediately with whatever data is already in the DB.
+    Returns (rows, stale_count) — stale_count > 0 means the client should poll.
+    Returns (None, 0) if the DB has no campgrounds at all.
     """
     campgrounds = db.get_campgrounds_near(olat, olon, radius)
     if not campgrounds:
-        return None
+        return None, 0
 
     for camp in campgrounds:
         camp['direction'] = _bearing_to_dir(_bearing(olat, olon, camp['lat'], camp['lon']))
 
     camp_ids = [c['id'] for c in campgrounds]
-
     stale = db.stale_camp_ids(camp_ids)
+
     if stale:
         stale_camps = [c for c in campgrounds if c['id'] in set(stale)]
-        log.info('On-demand fetch for %d stale campgrounds near (%.4f, %.4f)',
+        log.info('Background fetch started for %d stale campgrounds near (%.4f, %.4f)',
                  len(stale_camps), olat, olon)
-        refresh_forecasts_for(stale_camps, horizon=horizon)
+        threading.Thread(
+            target=refresh_forecasts_for,
+            args=(stale_camps,),
+            kwargs={'horizon': horizon},
+            daemon=True,
+        ).start()
 
     db_forecasts = db.get_forecasts_for_camps(camp_ids, horizon)
-    return build_grid_from_db(campgrounds, db_forecasts, threshold)
+    rows = build_grid_from_db(campgrounds, db_forecasts, threshold)
+    rows = [r for r in rows if r['days']]  # hide campgrounds with no forecast yet
+    return rows, len(stale)
 
 
 @bp.route('/')
@@ -110,10 +119,11 @@ def forecast():
     origin_lon     = body.get('origin_lon')
 
     rows = None
+    stale_count = 0
 
     if origin_lat is not None and origin_lon is not None:
         olat, olon = float(origin_lat), float(origin_lon)
-        rows = _rows_from_db(olat, olon, radius, horizon, threshold)
+        rows, stale_count = _rows_from_db(olat, olon, radius, horizon, threshold)
 
     if rows is None:
         # fallback: curated YAML + legacy forecast_cache
@@ -135,4 +145,6 @@ def forecast():
         'top3': top3,
         'best': best,
         'last_updated': _format_updated(cache_last_updated()),
+        'fetching': stale_count > 0,
+        'stale_count': stale_count,
     })

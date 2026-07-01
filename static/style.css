@@ -116,6 +116,22 @@ body.bur-body {
 }
 
 /* ── TICKER ── */
+.bur-fetching-banner {
+  background: var(--gold);
+  color: var(--ink);
+  padding: 7px 18px;
+  font-size: 11px;
+  font-family: 'Space Mono', monospace;
+  letter-spacing: .07em;
+  text-align: center;
+  animation: bur-blink-border 1.2s step-start infinite;
+}
+
+@keyframes bur-blink-border {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
 .bur-ticker {
   border-bottom: 2px solid var(--ink);
   background: var(--ink);
@@ -752,6 +768,12 @@ body.bur-body {
   letter-spacing: .04em;
 }
 
+.bur-table td.col-dist {
+  font-size: 10px;
+  color: var(--soft);
+  white-space: nowrap;
+}
+
 .bur-table td.col-day {
   padding: 4px 4px;
   text-align: center;
@@ -930,3 +952,150 @@ body.bur-body {
 
 /* ── UTIL ── */
 .bur-dot { color: var(--soft); }
+
+/* ── MOBILE CARDS (desktop: hidden) ── */
+.bur-mobile-list { display: none; }
+
+.bur-mcard {
+  border: 1.5px solid var(--ink);
+  background: var(--paper);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.bur-mcard--focused { background: rgba(47,107,79,.10); }
+
+.bur-mcard-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px 4px;
+}
+
+.bur-mcard-rank {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--soft);
+  min-width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.bur-mcard-rank--top {
+  color: var(--paper);
+  background: var(--red);
+  padding: 2px 5px;
+}
+
+.bur-mcard-name {
+  flex: 1;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: .01em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bur-mcard-score {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.bur-mcard-meta {
+  padding: 0 10px 6px;
+  font-size: 10px;
+  letter-spacing: .06em;
+  color: var(--soft);
+}
+
+.bur-mcard-days {
+  display: flex;
+  overflow-x: auto;
+  border-top: 1px solid var(--line);
+  gap: 3px;
+  padding: 4px;
+}
+
+.bur-mday {
+  flex: 0 0 auto;
+  min-width: 46px;
+  text-align: center;
+  padding: 4px 2px;
+  border: 1px solid var(--line);
+}
+
+.bur-mday--dry { background: rgba(47,107,79,.06); }
+.bur-mday--wet { background: rgba(178,64,44,.06); }
+.bur-mday--hot { background: rgba(192,112,32,.13); }
+
+.bur-mday-dow  { font-size: 8px; font-weight: 700; letter-spacing: .04em; color: var(--soft); }
+.bur-mday-date { font-size: 8px; color: var(--soft); }
+
+.bur-mday-temp {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.bur-mday-temp--hot { color: var(--red); }
+
+.bur-mday-rain { font-size: 9px; font-weight: 700; color: var(--green); }
+.bur-mday-rain--wet { color: var(--red); }
+
+/* ── RESPONSIVE / MOBILE ── */
+@media (max-width: 768px) {
+  body.bur-body { padding: 0 0 40px; }
+
+  .bur-sheet { border-left: none; border-right: none; }
+
+  /* header: compress */
+  .bur-header-logo { font-size: 26px; padding: 0 14px; }
+  .bur-header-name { font-size: 17px; }
+  .bur-header-sub  { display: none; }
+  .bur-header-meta { padding: 0 12px; }
+
+  /* single-column layout; sidebar moves below content */
+  .bur-body-grid { grid-template-columns: 1fr; }
+  .bur-main    { order: 1; }
+  .bur-sidebar { order: 2; border-right: none; border-top: 2px solid var(--ink); }
+
+  /* top-row: stack dispatch + radar */
+  .bur-top-row { grid-template-columns: 1fr; }
+  .bur-dispatch { border-right: none; border-bottom: 2px solid var(--ink); }
+  .bur-radar-panel { border-top: none; }
+
+  /* picks: single column */
+  .bur-picks { grid-template-columns: 1fr; }
+
+  /* trip-day strip: scrollable */
+  .bur-trip-days { overflow-x: auto; }
+  .bur-trip-day  { flex-shrink: 0; min-width: 52px; }
+
+  /* datasheet: tighter padding */
+  .bur-datasheet { padding: 12px 10px 20px; }
+  .bur-datasheet-hdr { flex-direction: column; gap: 2px; }
+
+  /* hide desktop table, show mobile cards */
+  .bur-table { display: none; }
+  .bur-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 0 8px;
+  }
+
+  /* unwrap the table-scroll border so cards breathe */
+  .bur-table-wrap {
+    overflow-x: visible;
+    border: none;
+  }
+}

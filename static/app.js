@@ -18,6 +18,7 @@
   const lastUpdatedFt   = document.getElementById('last-updated-footer');
   const stationCount    = document.getElementById('station-count');
   const tickerText      = document.getElementById('ticker-text');
+  const fetchingBanner  = document.getElementById('fetching-banner');
   const locationInput   = document.getElementById('location-input');
   const locationBtn     = document.getElementById('location-btn');
   const locationStatus  = document.getElementById('location-status');
@@ -41,11 +42,12 @@
   let focusName     = null;
   let horizon       = parseInt(document.querySelector('.bur-horizon-btn.active')?.dataset.val || '7', 10);
   let departIdx     = parseInt(document.querySelector('.bur-depart-btn.active')?.dataset.day || '2', 10) - 1;
-  let debounceTimer = null;
+  let debounceTimer  = null;
+  let fetchingTimer  = null;
   let originLat     = 39.1031;
   let originLon     = -84.5120;
   let originLabel   = 'Cincinnati, OH';
-  let radius        = parseInt(radiusInput?.value || '200', 10);
+  let radius        = parseInt(radiusInput?.value || '150', 10);
 
   /* ── HELPERS ── */
   function dayName(dateStr) {
@@ -363,17 +365,53 @@
         ? `<span class="${scoreClass(row.computedScore)}">${row.computedScore.toFixed(1)}</span>`
         : `<span class="bur-score--none">—</span>`;
 
+      const dist = row.distance_mi != null ? row.distance_mi + 'mi' : '—';
       return `<tr class="${sel ? 'bur-row--focused' : ''}" data-name="${esc(row.name)}">
         <td class="col-rank ${isTop ? 'col-rank--top' : ''}">${ri + 1}</td>
         <td class="col-name">${esc(row.name)}</td>
         <td class="col-dir">${row.direction.toUpperCase()}</td>
+        <td class="col-center col-dist">${dist}</td>
         ${dayCells}
         <td class="col-dry ${dryClass(row.dry_window)}">${row.dry_window}D</td>
         <td class="col-score">${scoreDisp}</td>
       </tr>`;
     }).join('');
 
-    const minW = Math.max(660, 380 + sampleDays.length * 60);
+    const mobileCards = scored.map((row, ri) => {
+      const isTop = ri < 3 && row.computedScore !== null;
+      const sel   = row.name === focusName;
+      const scoreDisp = row.computedScore !== null
+        ? `<span class="${scoreClass(row.computedScore)}">${row.computedScore.toFixed(1)}</span>`
+        : `<span class="bur-score--none">—</span>`;
+      const dist = row.distance_mi != null ? row.distance_mi + 'mi' : '—';
+      const dayPills = row.days.map((day, i) => {
+        const dry = day.precip_prob <= threshold;
+        const hot = day.temp_max > tempThresh;
+        const dow = forecastDates[i] ? dayName(forecastDates[i]) : ('D' + (i + 1));
+        const md  = forecastDates[i] ? dateShort(forecastDates[i]) : '';
+        let cls = 'bur-mday';
+        if (hot) cls += ' bur-mday--hot';
+        else if (dry) cls += ' bur-mday--dry';
+        else cls += ' bur-mday--wet';
+        return `<div class="${cls}">
+          <div class="bur-mday-dow">${dow.toUpperCase()}</div>
+          <div class="bur-mday-date">${md}</div>
+          <div class="bur-mday-temp${hot ? ' bur-mday-temp--hot' : ''}">${Math.round(day.temp_max)}°</div>
+          <div class="bur-mday-rain${dry ? '' : ' bur-mday-rain--wet'}">${day.precip_prob}%</div>
+        </div>`;
+      }).join('');
+      return `<div class="bur-mcard${sel ? ' bur-mcard--focused' : ''}" data-name="${esc(row.name)}">
+        <div class="bur-mcard-top">
+          <span class="bur-mcard-rank${isTop ? ' bur-mcard-rank--top' : ''}">${ri + 1}</span>
+          <span class="bur-mcard-name">${esc(row.name)}</span>
+          <span class="bur-mcard-score">${scoreDisp}</span>
+        </div>
+        <div class="bur-mcard-meta">${row.direction.toUpperCase()} · ${dist} · ${row.dry_window}D DRY</div>
+        <div class="bur-mcard-days bur-scroll">${dayPills}</div>
+      </div>`;
+    }).join('');
+
+    const minW = Math.max(700, 430 + sampleDays.length * 60);
     gridContainer.innerHTML = `
       <table class="bur-table" style="min-width:${minW}px;">
         <thead>
@@ -381,16 +419,18 @@
             <th class="col-rank">#</th>
             <th>Station</th>
             <th>Bearing</th>
+            <th class="col-center">Dist</th>
             ${dayThs}
             <th class="col-center">Dry</th>
             <th class="col-right">Index</th>
           </tr>
         </thead>
         <tbody>${bodyRows}</tbody>
-      </table>`;
+      </table>
+      <div class="bur-mobile-list">${mobileCards}</div>`;
 
-    gridContainer.querySelectorAll('tbody tr').forEach(tr => {
-      tr.addEventListener('click', () => setFocus(tr.dataset.name));
+    gridContainer.querySelectorAll('tbody tr, .bur-mcard').forEach(el => {
+      el.addEventListener('click', () => setFocus(el.dataset.name));
     });
   }
 
@@ -514,7 +554,25 @@
         renderTable(currentRows);
         renderRadar(currentRows);
 
-        if (stationCount) stationCount.textContent = currentRows.length;
+        const n = currentRows.length;
+        if (stationCount) {
+          stationCount.textContent = n >= 300
+            ? n + ' CAMPS (MAX — REDUCE RADIUS)'
+            : n + ' CAMPS LOADED';
+        }
+
+        clearTimeout(fetchingTimer);
+        if (data.fetching && data.stale_count > 0) {
+          if (fetchingBanner) {
+            fetchingBanner.textContent =
+              '⟳ ACQUIRING SIGNAL — FETCHING FORECASTS FOR ' + data.stale_count +
+              ' NEW STATIONS. AUTO-UPDATE IN 12s.';
+            fetchingBanner.style.display = 'block';
+          }
+          fetchingTimer = setTimeout(() => refresh(false), 12000);
+        } else {
+          if (fetchingBanner) fetchingBanner.style.display = 'none';
+        }
         if (lastUpdatedEl) lastUpdatedEl.textContent = data.last_updated;
         if (lastUpdatedFt) lastUpdatedFt.textContent = data.last_updated;
 
