@@ -64,13 +64,18 @@ def _rows_from_db(olat, olon, radius, horizon, threshold):
     camp_ids = [c['id'] for c in campgrounds]
     stale = db.stale_camp_ids(camp_ids)
 
+    # Camps to show the user in poll banner: only those with NO forecast rows yet.
+    # Old-but-present forecasts are still displayed immediately; we refresh them
+    # silently in the background without asking the user to wait 12 seconds.
+    missing = db.camps_with_no_forecasts(camp_ids) if stale else []
+    banner_count = len(missing)
+
     if stale:
         stale_camps = [c for c in campgrounds if c['id'] in set(stale)]
         if is_rate_limited():
-            # Cap already hit — don't spawn a doomed thread, don't tell the UI to poll.
             log.info('Stale camps (%d) exist but rate-limited — serving cached data without poll banner',
                      len(stale_camps))
-            stale = []
+            banner_count = 0
         else:
             log.info('Background fetch started for %d stale campgrounds near (%.4f, %.4f)',
                      len(stale_camps), olat, olon)
@@ -84,7 +89,7 @@ def _rows_from_db(olat, olon, radius, horizon, threshold):
     db_forecasts = db.get_forecasts_for_camps(camp_ids, horizon)
     rows = build_grid_from_db(campgrounds, db_forecasts, threshold)
     rows = [r for r in rows if r['days']]  # hide campgrounds with no forecast yet
-    return rows, len(stale)
+    return rows, banner_count
 
 
 @bp.route('/')

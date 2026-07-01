@@ -293,6 +293,22 @@ def stale_camp_ids(camp_ids, max_age_hours=7):
     return [cid for cid in camp_ids if cid not in fresh]
 
 
+def camps_with_no_forecasts(camp_ids):
+    """Return subset of camp_ids that have zero forecast rows (never fetched)."""
+    if not camp_ids:
+        return []
+    placeholders = ','.join('?' * len(camp_ids))
+    conn = _conn()
+    has_any = set(
+        r[0] for r in conn.execute(
+            f'SELECT DISTINCT campground_id FROM forecasts WHERE campground_id IN ({placeholders})',
+            camp_ids,
+        ).fetchall()
+    )
+    conn.close()
+    return [cid for cid in camp_ids if cid not in has_any]
+
+
 # ── API RATE TRACKING ─────────────────────────────────────────────────────────
 
 def log_api_call(service):
